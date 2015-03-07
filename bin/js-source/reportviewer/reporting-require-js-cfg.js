@@ -3,6 +3,6 @@ if(typeof document == "undefined" || document.location.href.indexOf("debug=true"
   requireCfg['paths']['reportviewer'] = prefix;
   requireCfg['paths']['pentaho/reportviewer'] = prefix+'/dojo/pentaho/reportviewer';
 } else {
-  requireCfg['paths']['reportviewer'] = prefix+'/compressed';
+  requireCfg['paths']['reportviewer'] = prefix /* +'/compressed' */;
   requireCfg['paths']['pentaho/reportviewer'] = prefix+'/dojo/pentaho/reportviewer';
 }

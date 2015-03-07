@@ -300,12 +300,19 @@ public class ParameterXmlContentHandler {
 		/*
 		 * type: java class (prefaced by "[L") if array
 		 */
-		element.setAttribute("type", getJavaType(multiValue, dataType));
+		final String javaType = getJavaType(multiValue, dataType);
+		element.setAttribute("type", javaType);
+		/*
+		 * parameter has an "is-mandatory" attribute which is usually false.
+		 * There is also a "mandatory" attribute child tag which is sometimes
+		 * true even when the attribute is false. The child tag only occurs on
+		 * parameters with the "user" role.
+		 */
 		element.setAttribute("is-mandatory", "false"); // TODO what is this?
 		element.setAttribute("is-list", isList ? "true" : "false");
 		element.setAttribute("is-multi-select", multiValue ? "true" : "false");
-		element.setAttribute("is-strict",
-				!isList || !allowNewValues.booleanValue() ? "true" : "false");
+		final boolean isStrict = !isList || !allowNewValues.booleanValue();
+		element.setAttribute("is-strict", isStrict ? "true" : "false");
 		// Must be a choice
 		/*
 		 * role: user, system
@@ -343,9 +350,10 @@ public class ParameterXmlContentHandler {
 		// submit: "pentaho.common.prompting.builders.SubmitComponentBuilder"
 		// submit-panel: "pentaho.common.prompting.builders.SubmitPanelBuilder"
 		// togglebutton: "pentaho.common.prompting.builders.MultiButtonBuilder"
+		final String parameterRenderType = getParameterRenderType(controlType,
+				dataType);
 		element.appendChild(createAttributeElement("parameter-render-type",
-				NS_PARAM_ATTR_CORE,
-				getParameterRenderType(controlType, dataType)));
+				NS_PARAM_ATTR_CORE, parameterRenderType));
 		element.appendChild(createAttributeElement("hidden",
 				NS_PARAM_ATTR_CORE,
 				isHidden == null || isHidden.booleanValue() ? "true" : "false"));
@@ -365,8 +373,8 @@ public class ParameterXmlContentHandler {
 		}
 		else if (defaultValue != null) {
 			final Element valuesElement = document.createElement("values");
-			valuesElement.appendChild(createValueElement("value", defaultValue,
-					true));
+			valuesElement.appendChild(createValueElement(defaultValue,
+					defaultValue, true));
 			element.appendChild(valuesElement);
 		}
 		return element;
@@ -398,10 +406,10 @@ public class ParameterXmlContentHandler {
 
 	private String getParameterRenderType(final String controlType,
 			final String dataType) {
-		if (controlType == "list-box") {
+		if ("list-box".equals(controlType)) {
 			return "dropdown";
 		}
-		if (dataType == "boolean")
+		if ("boolean".equals(dataType))
 			return "checkbox";
 		return "textbox";
 	}
