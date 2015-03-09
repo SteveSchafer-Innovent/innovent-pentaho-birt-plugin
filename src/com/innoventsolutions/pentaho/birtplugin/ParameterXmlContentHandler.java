@@ -113,6 +113,7 @@ public class ParameterXmlContentHandler {
 			// create other parameters that seem to be needed
 			parameters.appendChild(createAcceptedPageElement());
 			parameters.appendChild(createShowParametersElement());
+			parameters.appendChild(createOutputTargetElement());
 		}
 		this.document.appendChild(parameters);
 		final DOMSource source = new DOMSource(document);
@@ -122,6 +123,115 @@ public class ParameterXmlContentHandler {
 		transformer.transform(source, result);
 	}
 
+	/**
+	 * Creates the "output-target" parameter. This parameter is required by the
+	 * dashboard framework. It is similar, but not an exact match to BIRT output
+	 * format.
+	 *
+	 * @return
+	 */
+	private Node createOutputTargetElement() {
+		final Element element = document.createElement("parameter");
+		// <parameter is-list="true" is-mandatory="true" is-multi-select="false"
+		// is-strict="true" name="output-target" type="java.lang.String">
+		element.setAttribute("name", "output-target");
+		element.setAttribute("is-list", "true");
+		element.setAttribute("is-mandatory", "true");
+		element.setAttribute("is-multi-select", "false");
+		element.setAttribute("is-strict", "true"); // must be in list
+		element.setAttribute("type", "java.lang.String");
+		// <attribute name="role"
+		// namespace="http://reporting.pentaho.org/namespaces/engine/parameter-attributes/core"
+		// value="system"/>
+		element.appendChild(createAttributeElement("role", NS_PARAM_ATTR_CORE,
+				"system"));
+		// <attribute name="preferred"
+		// namespace="http://reporting.pentaho.org/namespaces/engine/parameter-attributes/core"
+		// value="true"/>
+		element.appendChild(createAttributeElement("preferred",
+				NS_PARAM_ATTR_CORE, "true"));
+		// <attribute name="parameter-group"
+		// namespace="http://reporting.pentaho.org/namespaces/engine/parameter-attributes/core"
+		// value="parameters"/>
+		element.appendChild(createAttributeElement("parameter-group",
+				NS_PARAM_ATTR_CORE, "parameters"));
+		// <attribute name="parameter-group-label"
+		// namespace="http://reporting.pentaho.org/namespaces/engine/parameter-attributes/core"
+		// value="Report Parameters"/>
+		element.appendChild(createAttributeElement("parameter-group-label",
+				NS_PARAM_ATTR_CORE, "Report Parameters"));
+		// <attribute name="label"
+		// namespace="http://reporting.pentaho.org/namespaces/engine/parameter-attributes/core"
+		// value="Output Type"/>
+		element.appendChild(createAttributeElement("label", NS_PARAM_ATTR_CORE,
+				"Output Type"));
+		// <attribute name="parameter-render-type"
+		// namespace="http://reporting.pentaho.org/namespaces/engine/parameter-attributes/core"
+		// value="dropdown"/>
+		element.appendChild(createAttributeElement("parameter-render-type",
+				NS_PARAM_ATTR_CORE, "dropdown"));
+		// <attribute name="hidden"
+		// namespace="http://reporting.pentaho.org/namespaces/engine/parameter-attributes/core"
+		// value="false"/>
+		element.appendChild(createAttributeElement("hidden",
+				NS_PARAM_ATTR_CORE, "false"));
+		// <values>
+		final Element valuesElement = document.createElement("values");
+		// <value label="HTML (Paginated)" null="false" selected="true"
+		// type="java.lang.String" value="table/html;page-mode=page"/>
+		// framework searches for "html"
+		valuesElement.appendChild(createValueElement("HTML (Paginated)", false,
+				true, "java.lang.String", "table/html;page-mode=page"));
+		// <value label="HTML (Single Page)" null="false" selected="false"
+		// type="java.lang.String" value="table/html;page-mode=stream"/>
+		valuesElement
+				.appendChild(createValueElement("HTML (Single Page)", false,
+						false, "java.lang.String",
+						"table/html;page-mode=stream"));
+		// <value label="PDF" null="false" selected="false"
+		// type="java.lang.String" value="pageable/pdf"/>
+		valuesElement.appendChild(createValueElement("PDF", false, false,
+				"java.lang.String", "pageable/pdf"));
+		// <value label="Excel" null="false" selected="false"
+		// type="java.lang.String" value="table/excel;page-mode=flow"/>
+		valuesElement.appendChild(createValueElement("Excel", false, false,
+				"java.lang.String", "table/excel;page-mode=flow"));
+		// <value label="Excel 2007" null="false" selected="false"
+		// type="java.lang.String"
+		// value="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;page-mode=flow"/>
+		valuesElement
+				.appendChild(createValueElement(
+						"Excel 2007",
+						false,
+						false,
+						"java.lang.String",
+						"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;page-mode=flow"));
+		// <value label="Comma Separated Value" null="false" selected="false"
+		// type="java.lang.String" value="table/csv;page-mode=stream"/>
+		valuesElement
+				.appendChild(createValueElement("Comma Separated Value", false,
+						false, "java.lang.String", "table/csv;page-mode=stream"));
+		// <value label="Rich-Text-Format" null="false" selected="false"
+		// type="java.lang.String" value="table/rtf;page-mode=flow"/>
+		valuesElement.appendChild(createValueElement("Rich-Text-Format", false,
+				false, "java.lang.String", "table/rtf;page-mode=flow"));
+		// <value label="Text" null="false" selected="false"
+		// type="java.lang.String" value="pageable/text"/>
+		valuesElement.appendChild(createValueElement("Text", false, false,
+				"java.lang.String", "pageable/text"));
+		// </values>
+		// </parameter>
+		element.appendChild(valuesElement);
+		// TODO Auto-generated method stub
+		return element;
+	}
+
+	/**
+	 * Creates the "showParameters" system parameter which is required by the
+	 * dashboard framework.
+	 *
+	 * @return
+	 */
 	private Element createShowParametersElement() {
 		final Element element = document.createElement("parameter");
 		// <parameter is-list="false" is-mandatory="false"
@@ -177,19 +287,20 @@ public class ParameterXmlContentHandler {
 		final Element valuesElement = document.createElement("values");
 		// <value label="true" null="false" selected="true"
 		// type="java.lang.Boolean" value="true"/>
-		final Element valueElement = document.createElement("value");
-		valueElement.setAttribute("label", "true");
-		valueElement.setAttribute("null", "false");
-		valueElement.setAttribute("selected", "true");
-		valueElement.setAttribute("type", "java.lang.Boolean");
-		valueElement.setAttribute("value", "true");
-		valuesElement.appendChild(valueElement);
+		valuesElement.appendChild(createValueElement("true", false, true,
+				"java.lang.Boolean", "true"));
 		// </values>
 		element.appendChild(valuesElement);
 		// </parameter>
 		return element;
 	}
 
+	/**
+	 * Creates the "accepted-page" system parameter which is required by the
+	 * dashboard framework.
+	 *
+	 * @return
+	 */
 	private Element createAcceptedPageElement() {
 		final Element element = document.createElement("parameter");
 		// <parameter is-list="false" is-mandatory="false"
@@ -293,8 +404,8 @@ public class ParameterXmlContentHandler {
 				.getStringValue("scalarParameterType");
 		final Integer autoSuggestThreshold = helper
 				.getIntegerValue("autoSuggestThreshold");
-		final boolean isList = controlType == "list-box";
-		final boolean multiValue = scalarParameterType == "multi-value";
+		final boolean isList = "list-box".equals(controlType);
+		final boolean multiValue = "multi-value".equals(scalarParameterType);
 		final Element element = document.createElement("parameter");
 		element.setAttribute("name", name);
 		/*
@@ -328,6 +439,88 @@ public class ParameterXmlContentHandler {
 		 * parameter-render-type (required): textbox, togglebutton, dropdown,
 		 * list
 		 */
+		final String parameterRenderType = getParameterRenderType(controlType,
+				dataType);
+		element.appendChild(createAttributeElement("parameter-render-type",
+				NS_PARAM_ATTR_CORE, parameterRenderType));
+		element.appendChild(createAttributeElement("hidden",
+				NS_PARAM_ATTR_CORE,
+				isHidden == null || isHidden.booleanValue() ? "true" : "false"));
+		element.appendChild(createAttributeElement("mandatory",
+				NS_PARAM_ATTR_CORE,
+				isRequired == null || isRequired.booleanValue() ? "true"
+						: "false"));
+		element.appendChild(createAttributeElement("label", NS_PARAM_ATTR_CORE,
+				promptText == null ? displayName == null ? name : displayName
+						: promptText));
+		if (isList) {
+			final List<Map<String, Object>> choices = getParameterChoices(
+					remoteFileId, name);
+			if (!choices.isEmpty()) {
+				element.appendChild(createValuesElement(choices));
+			}
+		}
+		else if ("boolean".equals(dataType)) {
+			final List<Map<String, Object>> choices = new ArrayList<Map<String, Object>>();
+			{
+				final Map<String, Object> map = new HashMap<String, Object>(2);
+				map.put("value", Boolean.TRUE);
+				map.put("label", "True");
+				map.put("selected",
+						Boolean.valueOf("true".equalsIgnoreCase(defaultValue)));
+				choices.add(map);
+			}
+			{
+				final Map<String, Object> map = new HashMap<String, Object>(2);
+				map.put("value", Boolean.FALSE);
+				map.put("label", "False");
+				map.put("selected",
+						Boolean.valueOf("false".equalsIgnoreCase(defaultValue)));
+				choices.add(map);
+			}
+			element.appendChild(createValuesElement(choices));
+		}
+		else if (defaultValue != null) {
+			final Element valuesElement = document.createElement("values");
+			valuesElement.appendChild(createValueElement(defaultValue,
+					defaultValue, true));
+			element.appendChild(valuesElement);
+		}
+		return element;
+	}
+
+	private Element createValuesElement(final List<Map<String, Object>> choices) {
+		final Element element = document.createElement("values");
+		for (final Map<String, Object> paramMap : choices) {
+			final Object label = paramMap.get("label");
+			final Object value = paramMap.get("value");
+			final Object selected = paramMap.get("selected");
+			element.appendChild(createValueElement(label.toString(), value,
+					Boolean.TRUE.equals(selected)));
+		}
+		return element;
+	}
+
+	private Element createValueElement(final String label, final Object value,
+			final boolean selected) {
+		return createValueElement(label, false, selected, "java.lang.String",
+				value.toString());
+	}
+
+	private Element createValueElement(final String label,
+			final boolean allowNull, final boolean selected, final String type,
+			final String value) {
+		final Element element = document.createElement("value");
+		element.setAttribute("label", label);
+		element.setAttribute("null", allowNull ? "true" : "false");
+		element.setAttribute("selected", selected ? "true" : "false");
+		element.setAttribute("type", type);
+		element.setAttribute("value", value);
+		return element;
+	}
+
+	private String getParameterRenderType(final String controlType,
+			final String dataType) {
 		// parameter-render-type:
 		// checkbox: "pentaho.common.prompting.builders.CheckBuilder"
 		// datepicker: "pentaho.common.prompting.builders.DateInputBuilder"
@@ -350,67 +543,11 @@ public class ParameterXmlContentHandler {
 		// submit: "pentaho.common.prompting.builders.SubmitComponentBuilder"
 		// submit-panel: "pentaho.common.prompting.builders.SubmitPanelBuilder"
 		// togglebutton: "pentaho.common.prompting.builders.MultiButtonBuilder"
-		final String parameterRenderType = getParameterRenderType(controlType,
-				dataType);
-		element.appendChild(createAttributeElement("parameter-render-type",
-				NS_PARAM_ATTR_CORE, parameterRenderType));
-		element.appendChild(createAttributeElement("hidden",
-				NS_PARAM_ATTR_CORE,
-				isHidden == null || isHidden.booleanValue() ? "true" : "false"));
-		element.appendChild(createAttributeElement("mandatory",
-				NS_PARAM_ATTR_CORE,
-				isRequired == null || isRequired.booleanValue() ? "true"
-						: "false"));
-		element.appendChild(createAttributeElement("label", NS_PARAM_ATTR_CORE,
-				promptText == null ? displayName == null ? name : displayName
-						: promptText));
-		if (isList) {
-			final List<Map<String, Object>> choices = getParameterChoices(
-					remoteFileId, name);
-			if (!choices.isEmpty()) {
-				element.appendChild(createValuesElement(choices));
-			}
-		}
-		else if (defaultValue != null) {
-			final Element valuesElement = document.createElement("values");
-			valuesElement.appendChild(createValueElement(defaultValue,
-					defaultValue, true));
-			element.appendChild(valuesElement);
-		}
-		return element;
-	}
-
-	private Element createValuesElement(final List<Map<String, Object>> choices) {
-		final Element element = document.createElement("values");
-		boolean first = true;
-		for (final Map<String, Object> paramMap : choices) {
-			final Object label = paramMap.get("label");
-			final Object value = paramMap.get("value");
-			element.appendChild(createValueElement(label.toString(), value,
-					first));
-			first = false;
-		}
-		return element;
-	}
-
-	private Node createValueElement(final String label, final Object value,
-			final boolean selected) {
-		final Element element = document.createElement("value");
-		element.setAttribute("label", label);
-		element.setAttribute("null", "false"); // TODO
-		element.setAttribute("selected", selected ? "true" : "false");
-		element.setAttribute("type", "java.lang.String"); // TODO
-		element.setAttribute("value", value.toString());
-		return element;
-	}
-
-	private String getParameterRenderType(final String controlType,
-			final String dataType) {
 		if ("list-box".equals(controlType)) {
 			return "dropdown";
 		}
 		if ("boolean".equals(dataType))
-			return "checkbox";
+			return "dropdown";
 		return "textbox";
 	}
 
