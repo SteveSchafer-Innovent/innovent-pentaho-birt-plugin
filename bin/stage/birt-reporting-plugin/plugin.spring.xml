@@ -20,7 +20,7 @@
 		<property name="mimeType" value="text/html" />
 		<property name="relativeFilePath" value="reportviewer/report.html" />
 		<property name="pluginId" value="birt-reporting" />
-	</bean>  
+	</bean>
 
 	<bean id="rptdesign.parameterUi"
 			class="org.pentaho.platform.plugin.services.webservices.content.PluginFileContentGenerator"
@@ -34,13 +34,15 @@
 			class="com.innoventsolutions.pentaho.birtplugin.ParameterContentGenerator"
 			scope="prototype"/>
 
+	<bean id="rptdesign.report"
+			class="com.innoventsolutions.pentaho.birtplugin.ReportContentGenerator"
+			scope="prototype"/>
+
+	<bean id="rptdesign"
+			class="com.innoventsolutions.pentaho.birtplugin.ReportContentGenerator"
+			scope="prototype"/>
+
 	<!-- 
-	<bean id="prpt"
-			class="org.pentaho.reporting.platform.plugin.ReportContentGenerator"
-			scope="prototype"/>
-	<bean id="prpt.report"
-			class="org.pentaho.reporting.platform.plugin.ReportContentGenerator"
-			scope="prototype"/>
 	<bean id="prpt.mobile"
 			class="org.pentaho.platform.plugin.services.webservices.content.PluginFileContentGenerator"
 			scope="prototype">
@@ -63,11 +65,6 @@
 			class="org.pentaho.reporting.platform.plugin.SimpleReportingComponent"
 			scope="prototype"/>
 
-	<!** Register with PentahoSystem **>
-	<bean
-		class="org.pentaho.platform.engine.core.system.objfac.spring.ApplicationContextPentahoSystemRegisterer"
-		scope="singleton"/>
- 
 	<bean class="org.pentaho.platform.engine.core.solution.ContentInfo">
 		<property name="mimeType" value="application/prpt"/>	
 		<property name="extension" value=".prpt"/>	

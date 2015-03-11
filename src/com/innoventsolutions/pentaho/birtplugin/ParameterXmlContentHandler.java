@@ -67,16 +67,24 @@ public class ParameterXmlContentHandler {
 		}
 		this.document = DocumentBuilderFactory.newInstance()
 				.newDocumentBuilder().newDocument();
+		final boolean isMobile = "true".equals(requestParameters
+				.getStringParameter("mobile", "false"));
 		// TODO inputs may contain parameter values and result in parameter
 		// prompts being hidden
 		final Element parameters;
 		parameters = document.createElement("parameters");
 		parameters.setAttribute("is-prompt-needed", "false"); // TODO ????
 		parameters.setAttribute("ignore-biserver-5538", "true");
-		parameters.setAttribute("autoSubmitUI", "true"); // TODO ????
-		// parameters.setAttribute("autoSubmitUI", "false");
-		parameters.setAttribute("layout", "vertical");
-		final IParameterProvider requestParams = getRequestParameters();
+		final Boolean autoSubmit = getBooleanRequestParameter("autoSubmit");
+		if (autoSubmit != null)
+			parameters.setAttribute("autoSubmit",
+					autoSubmit.booleanValue() ? "true" : "false");
+		final Boolean autoSubmitUI = getBooleanRequestParameter("autoSubmitUI");
+		parameters.setAttribute("autoSubmitUI", autoSubmitUI == null ? "true"
+				: autoSubmitUI.booleanValue() ? "true" : "false");
+		final String layout = requestParameters.getStringParameter("layout",
+				null);
+		parameters.setAttribute("layout", layout == null ? "vertical" : layout);
 		final RemoteFileManager remoteFileManager = new RemoteFileManager(
 				configuration);
 		remoteFileId = remoteFileManager.registerFile(fileId);
@@ -121,6 +129,13 @@ public class ParameterXmlContentHandler {
 		final Transformer transformer = TransformerFactory.newInstance()
 				.newTransformer();
 		transformer.transform(source, result);
+	}
+
+	private Boolean getBooleanRequestParameter(final String parameterName) {
+		final String parameterValue = requestParameters.getStringParameter(
+				parameterName, null);
+		return parameterValue == null ? null : Boolean.valueOf("true"
+				.equals(parameterValue));
 	}
 
 	/**
@@ -384,6 +399,7 @@ public class ParameterXmlContentHandler {
 		}
 		final MapHelper helper = new MapHelper();
 		final String name = helper.getStringValue("name");
+		final Object requestValue = requestParameters.getParameter(name);
 		final String displayName = helper.getStringValue("displayName");
 		final String helpText = helper.getStringValue("helpText");
 		final String type = helper.getStringValue("type");
@@ -422,9 +438,12 @@ public class ParameterXmlContentHandler {
 		element.setAttribute("is-mandatory", "false"); // TODO what is this?
 		element.setAttribute("is-list", isList ? "true" : "false");
 		element.setAttribute("is-multi-select", multiValue ? "true" : "false");
-		final boolean isStrict = !isList || !allowNewValues.booleanValue();
+		final boolean isStrict = "boolean".equals(dataType)
+				|| (isList && !allowNewValues.booleanValue());
+		/*
+		 * is-strict = must be a choice
+		 */
 		element.setAttribute("is-strict", isStrict ? "true" : "false");
-		// Must be a choice
 		/*
 		 * role: user, system
 		 */
@@ -457,7 +476,7 @@ public class ParameterXmlContentHandler {
 			final List<Map<String, Object>> choices = getParameterChoices(
 					remoteFileId, name);
 			if (!choices.isEmpty()) {
-				element.appendChild(createValuesElement(choices));
+				element.appendChild(createValuesElement(choices, requestValue));
 			}
 		}
 		else if ("boolean".equals(dataType)) {
@@ -466,19 +485,33 @@ public class ParameterXmlContentHandler {
 				final Map<String, Object> map = new HashMap<String, Object>(2);
 				map.put("value", Boolean.TRUE);
 				map.put("label", "True");
-				map.put("selected",
-						Boolean.valueOf("true".equalsIgnoreCase(defaultValue)));
+				boolean selected;
+				if (requestValue != null)
+					selected = "true".equals(requestValue);
+				else
+					selected = "true".equalsIgnoreCase(defaultValue);
+				map.put("selected", Boolean.valueOf(selected));
 				choices.add(map);
 			}
 			{
 				final Map<String, Object> map = new HashMap<String, Object>(2);
 				map.put("value", Boolean.FALSE);
 				map.put("label", "False");
-				map.put("selected",
-						Boolean.valueOf("false".equalsIgnoreCase(defaultValue)));
+				boolean selected;
+				if (requestValue != null)
+					selected = "false".equals(requestValue);
+				else
+					selected = "false".equalsIgnoreCase(defaultValue);
+				map.put("selected", Boolean.valueOf(selected));
 				choices.add(map);
 			}
-			element.appendChild(createValuesElement(choices));
+			element.appendChild(createValuesElement(choices, requestValue));
+		}
+		else if (requestValue != null) {
+			final Element valuesElement = document.createElement("values");
+			valuesElement.appendChild(createValueElement(
+					requestValue.toString(), requestValue, true));
+			element.appendChild(valuesElement);
 		}
 		else if (defaultValue != null) {
 			final Element valuesElement = document.createElement("values");
@@ -489,14 +522,19 @@ public class ParameterXmlContentHandler {
 		return element;
 	}
 
-	private Element createValuesElement(final List<Map<String, Object>> choices) {
+	private Element createValuesElement(
+			final List<Map<String, Object>> choices, final Object requestValue) {
 		final Element element = document.createElement("values");
 		for (final Map<String, Object> paramMap : choices) {
 			final Object label = paramMap.get("label");
 			final Object value = paramMap.get("value");
-			final Object selected = paramMap.get("selected");
+			final boolean selected;
+			if (requestValue == null)
+				selected = Boolean.TRUE.equals(paramMap.get("selected"));
+			else
+				selected = label != null && label.equals(requestValue);
 			element.appendChild(createValueElement(label.toString(), value,
-					Boolean.TRUE.equals(selected)));
+					selected));
 		}
 		return element;
 	}

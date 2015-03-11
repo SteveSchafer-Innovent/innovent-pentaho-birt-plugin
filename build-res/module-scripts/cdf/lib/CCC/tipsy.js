@@ -141,7 +141,7 @@ pen.define("cdf/lib/CCC/tipsy", [ "cdf/lib/CCC/protovis", "cdf/jquery", "cdf/lib
                         value: value
                     };
                 }
-                this === $fakeTipTarget[0] || def.assert();
+                if (this !== $fakeTipTarget[0]) throw new Error("Assertion failed.");
                 var $win = $(window), scrollOffset = {
                     width: $win.scrollLeft(),
                     height: $win.scrollTop()

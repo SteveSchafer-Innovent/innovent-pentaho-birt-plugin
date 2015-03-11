@@ -26,7 +26,7 @@
 
 /*! Copyright 2010 Stanford Visualization Group, Mike Bostock, BSD license. */
 
-/*! 13e90fd642a3578e717bb566df2ab393aaa4ecbf */
+/*! b3bcf01fff70f1fcad2464fa4a700c22f9ed4596 */
 
 /*
  * TERMS OF USE - EASING EQUATIONS
@@ -6188,6 +6188,7 @@ pen.define("cdf/lib/CCC/protovis", function() {
         return "string" == typeof c ? document.getElementById(c) : c;
     });
     pv.Panel.prototype.type = "panel";
+    pv.Panel.prototype.isPointingBarrier = !1;
     pv.Panel.prototype._zOrderChildCount = 0;
     pv.Panel.prototype.defaults = new pv.Panel().extend(pv.Bar.prototype.defaults).fillStyle(null).overflow("visible");
     pv.Panel.prototype.anchor = function(name) {
@@ -9071,17 +9072,23 @@ pen.define("cdf/lib/CCC/protovis", function() {
             if (scene.visible) for (var i = scene.children.length - 1; i >= 0; i--) if (searchScenes(scene.children[i], curr)) return !0;
         }
         function searchScenes(scenes, curr) {
-            var result, mark = scenes.mark, isPanel = "panel" === mark.type;
-            if (mark.$handlers.point) for (var visibility, mouse = (isPanel && mark.parent || mark).mouse(), markRMax = mark._pointingRadiusMax, markCostMax = markRMax * markRMax, j = scenes.length - 1; j >= 0; j--) if ((visibility = sceneVisibility(scenes, j)) && evalScene(scenes, j, mouse, curr, visibility, markCostMax)) {
-                result = !0;
-                break;
+            var result, j, isPointingBarrier, mark = scenes.mark, isPanel = "panel" === mark.type;
+            if (mark.$handlers.point) {
+                var visibility, mouse = (isPanel && mark.parent || mark).mouse(), markRMax = mark._pointingRadiusMax, markCostMax = markRMax * markRMax;
+                j = scenes.length;
+                for (;j--; ) if ((visibility = sceneVisibility(scenes, j)) && evalScene(scenes, j, mouse, curr, visibility, markCostMax)) {
+                    result = !0;
+                    break;
+                }
             }
             if (isPanel) {
                 mark.scene = scenes;
+                isPointingBarrier = !(!mark.isPointingBarrier || !mark.parent);
                 try {
-                    for (var j = scenes.length - 1; j >= 0; j--) {
+                    j = scenes.length;
+                    for (;j--; ) {
                         mark.index = j;
-                        if (searchSceneChildren(scenes[j], curr)) return !0;
+                        if ((!isPointingBarrier || mark.getShape(scenes, j).containsPoint(mark.parent.mouse())) && searchSceneChildren(scenes[j], curr)) return !0;
                     }
                 } finally {
                     delete mark.scene;

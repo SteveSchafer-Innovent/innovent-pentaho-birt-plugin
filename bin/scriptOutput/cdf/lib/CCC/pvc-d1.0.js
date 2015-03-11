@@ -420,6 +420,13 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
     pvc.data = cdo;
     var pvc_arraySlice = Array.prototype.slice;
     pvc.invisibleFill = "rgba(127,127,127,0.00001)";
+    !function() {
+        var setTipsyDebug = function(level) {
+            pv.Behavior.tipsy.setDebug(level);
+        };
+        setTipsyDebug(def.debug);
+        def.addOnDebugChanged(setTipsyDebug);
+    }();
     def.global.NoDataException = function() {};
     def.global.InvalidDataException = function(msg) {
         this.message = msg ? msg : "Invalid Data.";
@@ -1661,7 +1668,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             if (me.selectableByClick()) {
                 var ev = me.event;
                 me.select({
-                    replace: !ev || !ev.ctrlKey
+                    replace: !ev || !(ev.ctrlKey || ev.metaKey)
                 });
             }
         },
@@ -2871,12 +2878,11 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 });
             },
             _conciliateVisualRoles: function() {
-                function createError(msg, args) {
-                    return def.error.operationInvalid(def.format(msg, args));
-                }
                 var L = this.dataCells.length;
                 if (L > 1) {
-                    var otherRole, otherGrouping, possibleTraversalModes, traversalMode, otherTravMode, rootLabel, dimNamesKey, i, grouping = this._getBoundRoleGrouping(this.role);
+                    var otherRole, otherGrouping, possibleTraversalModes, traversalMode, otherTravMode, rootLabel, dimNamesKey, i, grouping = this._getBoundRoleGrouping(this.role), createError = function(msg, args) {
+                        return def.error.operationInvalid(def.format(msg, args));
+                    };
                     if ("discrete" === this.scaleType) {
                         possibleTraversalModes = this.role.traversalModes;
                         rootLabel = this.role.rootLabel;
@@ -3672,6 +3678,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                         this.pvPanel = this.pvPanel.add(pv.Panel);
                     }
                 } else this.pvPanel = this.parent.pvPanel.add(this.type);
+                this.pvPanel.isPointingBarrier = !0;
                 var pvBorderPanel = this.pvPanel, width = this.width - margins.width, height = this.height - margins.height;
                 pvBorderPanel.width(width).height(height);
                 def.debug >= 15 && (margins.width > 0 || margins.height > 0) && (this.isTopRoot ? this.pvRootPanel : this.parent.pvPanel).add(this.type).width(this.width).height(this.height).left(null != this.position.left ? this.position.left : null).right(null != this.position.right ? this.position.right : null).top(null != this.position.top ? this.position.top : null).bottom(null != this.position.bottom ? this.position.bottom : null).strokeStyle("orange").lineWidth(1).strokeDasharray("- .");
@@ -3781,6 +3788,13 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             this._children && this._children.forEach(function(c) {
                 c._onRenderEnd(animated);
             });
+            if (this.isTopRoot) {
+                var renderedCallback = this.chart.options.renderedCallback;
+                if (renderedCallback) {
+                    var context = this.context();
+                    renderedCallback.call(context, context.scene);
+                }
+            }
         },
         renderInteractive: function() {
             if (this.isVisible) {
@@ -4202,26 +4216,24 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             ka = Object.create(ka || {});
             ka.toggle = !1;
             var datums = this._getDatumsOnRubberBand(ev, ka);
-            if (datums) {
+            if (datums && datums.length) {
                 var chart = this.chart;
                 chart._updatingSelections(function() {
-                    var clearBefore = !ev.ctrlKey && chart.options.ctrlSelectMode;
-                    if (clearBefore) {
-                        chart.data.owner.clearSelected();
-                        cdo.Data.setSelected(datums, !0);
-                    } else ka.toggle ? cdo.Data.toggleSelected(datums) : cdo.Data.setSelected(datums, !0);
+                    datums = chart._onUserSelection(datums);
+                    if (datums && datums.length) {
+                        var clearBefore = !(ev.ctrlKey || ev.metaKey) && chart.options.ctrlSelectMode;
+                        if (clearBefore) {
+                            chart.data.owner.clearSelected();
+                            cdo.Data.setSelected(datums, !0);
+                        } else ka.toggle ? cdo.Data.toggleSelected(datums) : cdo.Data.setSelected(datums, !0);
+                    }
                 });
             }
         },
         _getDatumsOnRubberBand: function(ev, ka) {
             var datumMap = new def.Map();
             this._getDatumsOnRect(datumMap, this.rubberBand, ka);
-            var datums = datumMap.values();
-            if (datums.length) {
-                datums = this.chart._onUserSelection(datums);
-                datums && !datums.length && (datums = null);
-            }
-            return datums;
+            return datumMap.values();
         },
         _getDatumsOnRect: function(datumMap, rect, ka) {
             this._getOwnDatumsOnRect(datumMap, rect, ka);
@@ -4765,6 +4777,8 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 return itemScene.vars.font;
             }).textDecoration(function(itemScene) {
                 return itemScene.isOn() ? "" : "line-through";
+            }).cursor(function(itemScene) {
+                return itemScene.executable() ? "pointer" : "default";
             });
             def.debug >= 16 && pvLegendMarkerPanel.anchor("right").add(pv.Panel)[this.anchorLength()](0)[this.anchorOrthoLength()](0).fillStyle(null).strokeStyle(null).lineWidth(0).add(pv.Line).data(function(scene) {
                 var vars = scene.vars, labelBBox = pvc.text.getLabelBBox(Math.min(vars.labelWidthMax, vars.textSize.width), 2 * vars.textSize.height / 3, "left", "middle", 0, vars.textMargin), corners = labelBBox.source.points();
@@ -5094,7 +5108,9 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     return this.parent.height() / 2;
                 }).width(function() {
                     return this.parent.width();
-                }).lineWidth(1, extag).strokeStyle(sceneColorProp, extag);
+                }).lineWidth(1, extag).strokeStyle(sceneColorProp, extag).cursor(function(itemScene) {
+                    return itemScene.executable() ? "pointer" : "default";
+                });
                 rulePvProto && (rulePvBaseProto = rulePvProto.extend(rulePvBaseProto));
                 new pvc.visual.Rule(legendPanel, pvSymbolPanel, {
                     proto: rulePvBaseProto,
@@ -5121,7 +5137,9 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                         return !1;
                     }
                     return !0;
-                }, extag);
+                }, extag).cursor(function(itemScene) {
+                    return itemScene.executable() ? "pointer" : "default";
+                });
                 markerPvProto && (markerPvBaseProto = markerPvProto.extend(markerPvBaseProto));
                 new pvc.visual.Dot(legendPanel, pvSymbolPanel, {
                     proto: markerPvBaseProto,
@@ -5901,6 +5919,9 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
         },
         animatingStart: function() {
             return this.basePanel.animatingStart();
+        },
+        animating: function() {
+            return !!this.basePanel && this.basePanel.animating();
         },
         isOrientationVertical: function(orientation) {
             return (orientation || this.options.orientation) === pvc.orientation.vertical;
@@ -7732,7 +7753,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     return panel.valuesVisible && panel.valuesMask ? new pvc.visual.ValueLabel(panel, anchorMark, keyArgs) : null;
                 },
                 isNeeded: function(panel) {
-                    return panel.valuesVisible && panel.valuesMask;
+                    return panel.valuesVisible && !!panel.valuesMask;
                 }
             }
         },
@@ -7817,7 +7838,8 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     p || (p = pvLabel.parent);
                     t = p.height() - (pvLabel.bottom() || 0);
                 }
-                var labelCenter = pv.Label.getPolygon(m.width, m.height, pvLabel.textAlign(), pvLabel.textBaseline(), pvLabel.textAngle(), pvLabel.textMargin()).center().plus(l, t), anchoredToShape = anchoredToMark.getShape(anchoredToMark.scene, pvLabel.index);
+                var anchoredToShape, labelCenter = pv.Label.getPolygon(m.width, m.height, pvLabel.textAlign(), pvLabel.textBaseline(), pvLabel.textAngle(), pvLabel.textMargin()).center().plus(l, t);
+                anchoredToShape = anchoredToMark === pvLabel.parent ? new pv.Shape.Rect(0, 0, anchoredToMark.width(), anchoredToMark.height()) : anchoredToMark.getShape(anchoredToMark.scene, anchoredToMark.index);
                 return anchoredToShape.containsPoint(labelCenter);
             },
             maybeOptimizeColorLegibility: function(scene, color, type) {
@@ -8649,7 +8671,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 this.extend(scale, "scale");
                 this._isScaleSetup = !0;
             }
-            if (scale.isNull) layoutInfo.axisSize = 0; else {
+            if (scale.isNull) layoutInfo.axisSize = layoutInfo.desiredClientSize[this.anchorOrthoLength()] || 0; else {
                 var a_length = this.anchorLength(), rangeInfo = this.axis.getScaleRangeInfo();
                 rangeInfo && (null != rangeInfo.value ? clientSize[a_length] = rangeInfo.value : null != rangeInfo.min && (clientSize[a_length] = Math.max(Math.min(clientSize[a_length], rangeInfo.max), rangeInfo.min)));
                 this._calcLayoutCore(layoutInfo);
@@ -10772,7 +10794,9 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 extensionId: "bar",
                 freePosition: !0,
                 wrapper: wrapper
-            }).lockDimensions().pvMark.antialias(function(scene) {
+            }).lockDimensions().optional("visible", function(scene) {
+                return null != scene.getValue();
+            }).pvMark.antialias(function(scene) {
                 if (widthNeedsAntialias) return !0;
                 var y = sceneOrthoScale(scene), h = null == y ? 0 : Math.abs(y - orthoZero);
                 return 1e-8 > h;
@@ -12045,11 +12069,11 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     return v1f.call(pseudo, d);
                 };
             });
-            var lineAreaVisibleProp = isBaseDiscrete && isStacked ? function(scene) {
-                return !scene.isNull || scene.isIntermediate;
-            } : function(scene) {
+            var sceneNotNullProp = function(scene) {
                 return !scene.isNull;
-            }, isLineAreaNoSelect = chart.selectableByFocusWindow();
+            }, sceneNotNullOrIntermProp = function(scene) {
+                return !scene.isNull || scene.isIntermediate;
+            }, areaVisibleProp = isBaseDiscrete && isStacked ? sceneNotNullOrIntermProp : sceneNotNullProp, isLineAreaNoSelect = chart.selectableByFocusWindow();
             this.pvArea = new pvc.visual.Area(this, this.pvScatterPanel, {
                 extensionId: "area",
                 noTooltip: !1,
@@ -12059,7 +12083,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 showsSelection: !isLineAreaNoSelect
             }).lockMark("data", function(seriesScene) {
                 return seriesScene.childNodes;
-            }).lockMark("visible", lineAreaVisibleProp).override("x", function(scene) {
+            }).lockMark("visible", areaVisibleProp).override("x", function(scene) {
                 return scene.basePosition;
             }).override("y", function(scene) {
                 return scene.orthoPosition;
@@ -12077,7 +12101,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             this._applyV1BarSecondExtensions && extensionIds.push({
                 abs: "barSecondLine"
             });
-            var lineVisibleProp = !dotsVisibleOnly && lineAreaVisibleProp, noLineInteraction = areasVisible && !linesVisible;
+            var lineVisibleProp = dotsVisibleOnly ? !1 : isBaseDiscrete && isStacked && areasVisible ? sceneNotNullOrIntermProp : sceneNotNullProp, noLineInteraction = areasVisible && !linesVisible;
             this.pvLine = new pvc.visual.Line(this, this.pvArea.anchor(this.anchorOpposite(anchor)), {
                 extensionId: extensionIds,
                 freePosition: !0,
@@ -12199,16 +12223,14 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 toScene.isSingle = !1;
             }
             function createIntermediateScene(seriesScene, fromScene, toScene, toChildIndex, belowScene) {
-                var interIsNull = fromScene.isNull || toScene.isNull;
-                if (interIsNull && !this.areasVisible) return null;
-                var interValue, interAccValue, interBasePosition;
+                var interValue, interAccValue, interBasePosition, interIsNull = fromScene.isNull || toScene.isNull, areasVisible = this.areasVisible;
                 if (interIsNull) {
-                    if (belowScene && isBaseDiscrete) {
+                    if (areasVisible && belowScene && isBaseDiscrete) {
                         var belowValueVar = belowScene.vars.value;
                         interAccValue = belowValueVar.accValue;
                         interValue = belowValueVar[valueRole.name];
                     } else interValue = interAccValue = orthoNullValue;
-                    interBasePosition = isStacked && isBaseDiscrete ? toScene.basePosition - sceneBaseScale.range().step / 2 : fromScene.isNull ? toScene.basePosition : fromScene.basePosition;
+                    interBasePosition = areasVisible ? isStacked && isBaseDiscrete ? toScene.basePosition - sceneBaseScale.range().step / 2 : fromScene.isNull ? toScene.basePosition : fromScene.basePosition : (toScene.basePosition + fromScene.basePosition) / 2;
                 } else {
                     var fromValueVar = fromScene.vars.value, toValueVar = toScene.vars.value;
                     interValue = (toValueVar.value + fromValueVar.value) / 2;
@@ -12235,20 +12257,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 interScene.orthoLength = orthoScale(interAccValue) - orthoZero;
                 colorVarHelper.onNewScene(interScene, !0);
                 return interScene;
-            }
-            function trimNullSeriesScenes(seriesScene) {
-                for (var scene, siblingScene, seriesScenes = seriesScene.childNodes, L = seriesScenes.length; L && (scene = seriesScenes[0]).isNull; ) {
-                    siblingScene = scene.nextSibling;
-                    if (siblingScene && !siblingScene.isNull) break;
-                    seriesScene.removeAt(0);
-                    L--;
-                }
-                for (;L && (scene = seriesScenes[L - 1]).isNull; ) {
-                    siblingScene = scene.previousSibling;
-                    if (siblingScene && !siblingScene.isNull) break;
-                    seriesScene.removeAt(L - 1);
-                    L--;
-                }
             }
             var rootScene = new pvc.visual.Scene(null, {
                 panel: this,
@@ -12288,9 +12296,8 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     serCatScene.isIntermediate = !1;
                 }, this);
             }, this);
-            var belowSeriesScenes2, reversedSeriesScenes = rootScene.children().reverse().array();
-            reversedSeriesScenes.forEach(completeSeriesScenes, this);
-            reversedSeriesScenes.forEach(trimNullSeriesScenes, this);
+            var belowSeriesScenes2;
+            rootScene.children().reverse().each(completeSeriesScenes, this);
             return rootScene;
         }
     });
@@ -13044,7 +13051,10 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             var label = pvc.visual.ValueLabel.maybeCreate(me, me.pvHeatGrid, {
                 wrapper: wrapper
             });
-            label && (me.pvHeatGridLabel = label.pvMark);
+            if (label) {
+                me.pvHeatGridLabel = label.pvMark;
+                me.useShapes && label.override("getAnchoredToMark", def.fun.constant(me.shapes));
+            }
         },
         _calcCellSize: function() {
             var xScale = this.axes.x.scale, yScale = this.axes.y.scale, w = (xScale.max - xScale.min) / xScale.domain().length, h = (yScale.max - yScale.min) / yScale.domain().length;

@@ -9,6 +9,7 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.pentaho.platform.api.engine.IParameterProvider;
+import org.pentaho.platform.api.engine.IPentahoSession;
 import org.pentaho.platform.api.repository2.unified.IUnifiedRepository;
 import org.pentaho.platform.api.repository2.unified.RepositoryFile;
 import org.pentaho.platform.engine.core.solution.SimpleParameterProvider;
@@ -129,5 +130,9 @@ public class ParameterContentGenerator extends SimpleContentGenerator {
 			inputs.put(paramName, paramValue);
 		}
 		return inputs;
+	}
+
+	public IPentahoSession getUserSession() {
+		return userSession;
 	}
 }
