@@ -468,21 +468,18 @@ public class ParameterXmlContentHandler {
 		}
 		else if ("boolean".equals(dataType)) {
 			final List<Map<String, Object>> choices = new ArrayList<Map<String, Object>>();
-			final boolean boolDefaultValue = requestValue != null ? "true"
-					.equalsIgnoreCase(requestValue.toString()) : "true"
-					.equalsIgnoreCase(defaultValue);
 			{
 				final Map<String, Object> map = new HashMap<String, Object>(2);
 				map.put("value", Boolean.TRUE);
 				map.put("label", "True");
-				map.put("selected", Boolean.valueOf(boolDefaultValue));
+				map.put("selected", Boolean.TRUE);
 				choices.add(map);
 			}
 			{
 				final Map<String, Object> map = new HashMap<String, Object>(2);
 				map.put("value", Boolean.FALSE);
 				map.put("label", "False");
-				map.put("selected", Boolean.valueOf(!boolDefaultValue));
+				map.put("selected", Boolean.FALSE);
 				choices.add(map);
 			}
 			element.appendChild(createValuesElement(choices, requestValue));
@@ -509,10 +506,13 @@ public class ParameterXmlContentHandler {
 			final Object label = paramMap.get("label");
 			final Object value = paramMap.get("value");
 			final boolean selected;
-			if (requestValue == null)
+			if (requestValue == null) {
 				selected = Boolean.TRUE.equals(paramMap.get("selected"));
-			else
-				selected = label != null && label.equals(requestValue);
+			}
+			else {
+				selected = value != null
+						&& value.toString().equals(requestValue);
+			}
 			element.appendChild(createValueElement(label.toString(), value,
 					selected));
 		}
