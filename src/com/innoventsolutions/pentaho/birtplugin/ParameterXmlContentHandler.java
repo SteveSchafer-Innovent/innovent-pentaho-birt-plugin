@@ -139,9 +139,18 @@ public class ParameterXmlContentHandler {
 	 * dashboard framework. Instead of the values required by Pentaho reports we
 	 * will fill it with values required for the output format of BIRT reports.
 	 *
+	 * One of the criteria for determining if a report has parameters (so the
+	 * parameters dialog will show up) is that it has an output-target
+	 * parameter. (see FileResource.doIsParameterizable())
+	 *
+	 * Also reportviewer.js examines output-target to determine if the report is
+	 * HTML.
+	 *
 	 * @return
 	 */
 	private Node createOutputTargetElement() {
+		final Object requestValue = requestParameters
+				.getParameter("output-target");
 		final Element element = document.createElement("parameter");
 		// <parameter is-list="true" is-mandatory="true" is-multi-select="false"
 		// is-strict="true" name="output-target" type="java.lang.String">
@@ -206,10 +215,13 @@ public class ParameterXmlContentHandler {
 		// type="java.lang.String" value="table/rtf;page-mode=flow"/>
 		// <value label="Text" null="false" selected="false"
 		// type="java.lang.String" value="pageable/text"/>
-		valuesElement.appendChild(createValueElement("HTML", false, true,
-				"java.lang.String", "html"));
-		valuesElement.appendChild(createValueElement("PDF", false, false,
-				"java.lang.String", "pdf"));
+		final String defaultValue = requestValue == null ? "html"
+				: requestValue.toString().toLowerCase();
+		valuesElement.appendChild(createValueElement("HTML", false,
+				"html".equals(defaultValue), "java.lang.String", "html"));
+		valuesElement.appendChild(createValueElement("PDF", false,
+				"pdf".equals(defaultValue), "java.lang.String", "pdf"));
+		// TODO
 		// </values>
 		// </parameter>
 		element.appendChild(valuesElement);
@@ -456,28 +468,21 @@ public class ParameterXmlContentHandler {
 		}
 		else if ("boolean".equals(dataType)) {
 			final List<Map<String, Object>> choices = new ArrayList<Map<String, Object>>();
+			final boolean boolDefaultValue = requestValue != null ? "true"
+					.equalsIgnoreCase(requestValue.toString()) : "true"
+					.equalsIgnoreCase(defaultValue);
 			{
 				final Map<String, Object> map = new HashMap<String, Object>(2);
 				map.put("value", Boolean.TRUE);
 				map.put("label", "True");
-				boolean selected;
-				if (requestValue != null)
-					selected = "true".equals(requestValue);
-				else
-					selected = "true".equalsIgnoreCase(defaultValue);
-				map.put("selected", Boolean.valueOf(selected));
+				map.put("selected", Boolean.valueOf(boolDefaultValue));
 				choices.add(map);
 			}
 			{
 				final Map<String, Object> map = new HashMap<String, Object>(2);
 				map.put("value", Boolean.FALSE);
 				map.put("label", "False");
-				boolean selected;
-				if (requestValue != null)
-					selected = "false".equals(requestValue);
-				else
-					selected = "false".equalsIgnoreCase(defaultValue);
-				map.put("selected", Boolean.valueOf(selected));
+				map.put("selected", Boolean.valueOf(!boolDefaultValue));
 				choices.add(map);
 			}
 			element.appendChild(createValuesElement(choices, requestValue));
