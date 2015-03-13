@@ -34,24 +34,20 @@ import com.sun.jersey.api.client.filter.HTTPBasicAuthFilter;
 public class ParameterXmlContentHandler {
 	public static final String SYS_PARAM_SESSION_ID = "::session";
 	private static final String NS_PARAM_ATTR_CORE = "http://reporting.pentaho.org/namespaces/engine/parameter-attributes/core";
-	private final boolean paginate;
 	private final Map<String, Object> inputs;
 	private final IParameterProvider requestParameters;
 	private Document document;
 	private final Configuration configuration;
 	private String remoteFileId = null;
+	private final boolean paginate;
 
 	public ParameterXmlContentHandler(
 			final ParameterContentGenerator contentGenerator,
 			final boolean paginate) {
-		this.paginate = paginate;
 		this.inputs = contentGenerator.createInputs();
 		this.requestParameters = contentGenerator.getRequestParameters();
 		this.configuration = new Configuration();
-	}
-
-	private IParameterProvider getRequestParameters() {
-		return requestParameters;
+		this.paginate = paginate;
 	}
 
 	public void createParameterContent(final OutputStream outputStream,
@@ -140,8 +136,8 @@ public class ParameterXmlContentHandler {
 
 	/**
 	 * Creates the "output-target" parameter. This parameter is required by the
-	 * dashboard framework. It is similar, but not an exact match to BIRT output
-	 * format.
+	 * dashboard framework. Instead of the values required by Pentaho reports we
+	 * will fill it with values required for the output format of BIRT reports.
 	 *
 	 * @return
 	 */
@@ -195,49 +191,28 @@ public class ParameterXmlContentHandler {
 		// <value label="HTML (Paginated)" null="false" selected="true"
 		// type="java.lang.String" value="table/html;page-mode=page"/>
 		// framework searches for "html"
-		valuesElement.appendChild(createValueElement("HTML (Paginated)", false,
-				true, "java.lang.String", "table/html;page-mode=page"));
 		// <value label="HTML (Single Page)" null="false" selected="false"
 		// type="java.lang.String" value="table/html;page-mode=stream"/>
-		valuesElement
-				.appendChild(createValueElement("HTML (Single Page)", false,
-						false, "java.lang.String",
-						"table/html;page-mode=stream"));
 		// <value label="PDF" null="false" selected="false"
 		// type="java.lang.String" value="pageable/pdf"/>
-		valuesElement.appendChild(createValueElement("PDF", false, false,
-				"java.lang.String", "pageable/pdf"));
 		// <value label="Excel" null="false" selected="false"
 		// type="java.lang.String" value="table/excel;page-mode=flow"/>
-		valuesElement.appendChild(createValueElement("Excel", false, false,
-				"java.lang.String", "table/excel;page-mode=flow"));
 		// <value label="Excel 2007" null="false" selected="false"
 		// type="java.lang.String"
 		// value="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;page-mode=flow"/>
-		valuesElement
-				.appendChild(createValueElement(
-						"Excel 2007",
-						false,
-						false,
-						"java.lang.String",
-						"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;page-mode=flow"));
 		// <value label="Comma Separated Value" null="false" selected="false"
 		// type="java.lang.String" value="table/csv;page-mode=stream"/>
-		valuesElement
-				.appendChild(createValueElement("Comma Separated Value", false,
-						false, "java.lang.String", "table/csv;page-mode=stream"));
 		// <value label="Rich-Text-Format" null="false" selected="false"
 		// type="java.lang.String" value="table/rtf;page-mode=flow"/>
-		valuesElement.appendChild(createValueElement("Rich-Text-Format", false,
-				false, "java.lang.String", "table/rtf;page-mode=flow"));
 		// <value label="Text" null="false" selected="false"
 		// type="java.lang.String" value="pageable/text"/>
-		valuesElement.appendChild(createValueElement("Text", false, false,
-				"java.lang.String", "pageable/text"));
+		valuesElement.appendChild(createValueElement("HTML", false, true,
+				"java.lang.String", "html"));
+		valuesElement.appendChild(createValueElement("PDF", false, false,
+				"java.lang.String", "pdf"));
 		// </values>
 		// </parameter>
 		element.appendChild(valuesElement);
-		// TODO Auto-generated method stub
 		return element;
 	}
 

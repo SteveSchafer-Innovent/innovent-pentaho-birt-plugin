@@ -10,6 +10,8 @@ import org.apache.commons.logging.LogFactory;
 import org.pentaho.platform.api.engine.IParameterProvider;
 import org.pentaho.platform.api.repository2.unified.IUnifiedRepository;
 import org.pentaho.platform.api.repository2.unified.RepositoryFile;
+import org.pentaho.platform.engine.core.audit.AuditHelper;
+import org.pentaho.platform.engine.core.audit.MessageTypes;
 import org.pentaho.platform.engine.core.system.PentahoSystem;
 import org.pentaho.platform.plugin.services.pluginmgr.PluginClassLoader;
 import org.pentaho.platform.util.UUIDUtil;
@@ -74,10 +76,31 @@ public class ReportContentGenerator extends ParameterContentGenerator {
 			}
 			case REPORT: {
 				// create inputs from request parameters
+				final ExecuteReportContentHandler.Auditor auditor = new ExecuteReportContentHandler.Auditor() {
+					@Override
+					public void start() {
+						AuditHelper.audit(userSession.getId(),
+								userSession.getName(), repoFile.getPath(),
+								ReportContentGenerator.this.getObjectName(),
+								ExecuteReportContentHandler.class.getName(),
+								MessageTypes.INSTANCE_START, instanceId, "", 0,
+								ReportContentGenerator.this);
+					}
+
+					@Override
+					public void end(final String result, final long time) {
+						AuditHelper.audit(userSession.getId(),
+								userSession.getName(), repoFile.getPath(),
+								ReportContentGenerator.this.getObjectName(),
+								ExecuteReportContentHandler.class.getName(),
+								result, instanceId, "", ((float) time / 1000),
+								ReportContentGenerator.this);
+					}
+				};
 				final ExecuteReportContentHandler executeReportContentHandler = new ExecuteReportContentHandler(
-						this);
+						this.createInputs(), auditor);
 				executeReportContentHandler.createReportContent(outputStream,
-						repoFile.getId(), repoFile.getPath(), false);
+						repoFile.getId(), false);
 				break;
 			}
 			default:
@@ -116,9 +139,6 @@ public class ReportContentGenerator extends ParameterContentGenerator {
 		final IParameterProvider requestParams = getRequestParameters();
 		final IParameterProvider pathParams = getPathParameters();
 		RENDER_TYPE renderMode = null;
-		// final String path = null;
-		// final IUnifiedRepository unifiedRepository = PentahoSystem.get(
-		// IUnifiedRepository.class, null);
 		if (requestParams != null
 				&& requestParams.getStringParameter("renderMode", null) != null) {
 			renderMode = RENDER_TYPE.valueOf(requestParams.getStringParameter(
@@ -142,32 +162,6 @@ public class ReportContentGenerator extends ParameterContentGenerator {
 			// perhaps we can invent our own mime-type or use application/zip?
 			return "application/octet-stream";
 		}
-		// try {
-		// if (requestParams != null
-		// && requestParams.getStringParameter("path", null) != null) {
-		// path = requestParams.getStringParameter("path", "");
-		// }
-		// else if (pathParams != null
-		// && pathParams.getStringParameter("path", null) != null) {
-		// path = pathParams.getStringParameter("path", "");
-		// }
-		// path = idTopath(URLDecoder.decode(path, "UTF-8"));
-		// }
-		// catch (final UnsupportedEncodingException e) {
-		// e.printStackTrace();
-		// }
-		// final RepositoryFile repoFile = unifiedRepository.getFile(path);
-		// final boolean isMobile = "true".equals(requestParams
-		// .getStringParameter("mobile", "false"));
-		// final SimpleReportingComponent reportComponent = new
-		// SimpleReportingComponent();
-		// final Map<String, Object> inputs = createInputs(requestParams);
-		// reportComponent.setForceDefaultOutputTarget(isMobile);
-		// reportComponent
-		// .setDefaultOutputTarget(HtmlTableModule.TABLE_HTML_PAGE_EXPORT_TYPE);
-		// reportComponent.setReportFileId(repoFile.getId());
-		// reportComponent.setInputs(inputs);
-		// return reportComponent.getMimeType();
 		if (requestParams == null) {
 			return "application/octet-stream";
 		}

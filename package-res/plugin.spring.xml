@@ -42,6 +42,10 @@
 			class="com.innoventsolutions.pentaho.birtplugin.ReportContentGenerator"
 			scope="prototype"/>
 
+	<bean id="rptdesign.backgroundExecution"
+			class="com.innoventsolutions.pentaho.birtplugin.BirtReportingAction"
+			scope="prototype"/>
+
 	<!-- 
 	<bean id="prpt.mobile"
 			class="org.pentaho.platform.plugin.services.webservices.content.PluginFileContentGenerator"
@@ -50,9 +54,6 @@
 		<property name="relativeFilePath" value="reportviewer/report.html" />
 		<property name="pluginId" value="reporting" />
 	</bean>  
-	<bean id="prpt.backgroundExecution"
-			class="org.pentaho.reporting.platform.plugin.SimpleReportingAction"
-			scope="prototype"/>
 	<bean id="prpt.viewer-gwt"
 			class="org.pentaho.platform.plugin.services.webservices.content.PluginFileContentGenerator"
 			scope="prototype">

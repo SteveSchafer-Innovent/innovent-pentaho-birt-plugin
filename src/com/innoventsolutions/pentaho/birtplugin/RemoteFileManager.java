@@ -46,6 +46,13 @@ public class RemoteFileManager {
 				fileId, SimpleRepositoryFileData.class);
 		final InputStream inputStream = data.getInputStream();
 		// upload the file to BMR
+		final String remoteFileId = sendFile(inputStream);
+		map.put(fileId, new RemoteFile(remoteFileId, System.currentTimeMillis()
+				+ 15 * 60 * 60 * 1000));
+		return remoteFileId;
+	}
+
+	public String sendFile(final InputStream inputStream) {
 		final ClientConfig config = new DefaultClientConfig();
 		final ClientFilter authFilter = new HTTPBasicAuthFilter(
 				configuration.getUsername(), configuration.getPassword());
@@ -93,8 +100,6 @@ public class RemoteFileManager {
 				// TODO associate remote file id with local file
 			}
 		}
-		map.put(fileId, new RemoteFile(remoteFileId, System.currentTimeMillis()
-				+ 15 * 60 * 60 * 1000));
 		return remoteFileId;
 	}
 }
