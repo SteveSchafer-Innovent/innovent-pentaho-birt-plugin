@@ -592,7 +592,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                 textFrag += t;
             }, endTextFrag = function() {
                 if (textFrag) {
-                    tryParseAbbrCurr();
                     addToken0({
                         type: 0,
                         text: textFrag
@@ -624,7 +623,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     scale: 0,
                     groupOn: 0,
                     scientific: 0,
-                    abbreviationOn: 0,
                     integer: {
                         list: [],
                         digits: 0
@@ -635,34 +633,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     }
                 };
                 part = section.integer;
-            }, tryParseAbbrCurr = function() {
-                if ("A" === textFrag) {
-                    textFrag = "";
-                    addToken({
-                        type: 6
-                    });
-                } else if ("C" === textFrag) {
-                    textFrag = "";
-                    addToken({
-                        type: 4
-                    });
-                } else if ("AC" === textFrag) {
-                    textFrag = "";
-                    addToken({
-                        type: 6
-                    });
-                    addToken({
-                        type: 4
-                    });
-                } else if ("CA" === textFrag) {
-                    textFrag = "";
-                    addToken({
-                        type: 4
-                    });
-                    addToken({
-                        type: 6
-                    });
-                }
             }, tryParseExponent = function() {
                 var c2, k = i + 1, positive = !1, digits = 0;
                 if (L > k) {
@@ -711,17 +681,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     }
                 } else if ("¤" === c) addToken({
                     type: 4
-                }); else if ("C" === c && "Currency" === mask.substring(i, i + 8)) {
-                    addToken({
-                        type: 4
-                    });
-                    i += 7;
-                } else if ("A" === c && "Abbreviation" === mask.substring(i, i + 12)) {
-                    addToken({
-                        type: 6
-                    });
-                    i += 11;
-                } else if (";" === c) {
+                }); else if (";" === c) {
                     endSection();
                     if (i + 1 >= L || ";" === mask.charAt(i + 1)) {
                         i++;
@@ -738,9 +698,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     0 > j && (j = L);
                     addTextFrag(mask.substring(i, j));
                     i = j;
-                } else if (" " === c) addToken({
-                    type: 7
-                }); else if ("e" !== c && "E" !== c || !tryParseExponent()) {
+                } else if ("e" !== c && "E" !== c || !tryParseExponent()) {
                     "%" === c ? section.scale += 2 : "‰" === c ? section.scale += 3 : "‱" === c && (section.scale += 4);
                     addTextFrag(c);
                 } else ;
@@ -787,15 +745,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
 
           case 5:
             addStep(numForm_buildExponent(section, token));
-            break;
-
-          case 6:
-            section.abbreviationOn = 1;
-            addStep(numForm_abbreviationSymbol);
-            break;
-
-          case 7:
-            addStep(numForm_buildLiteral(" "));
         }
         !beforeDecimal && part.digits && steps.unshift(numForm_buildReadDecimalSymbol(hasZero));
     }
@@ -820,15 +769,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
     }
     function numForm_buildFormatSectionPosNeg(section) {
         function numFormRt_formatSectionPosNeg(style, value, zeroFormat, negativeMode) {
-            var sdigits, abbreviation, value0 = value, exponent = 0, scale = section.scale;
-            if (section.abbreviationOn) for (var L = style.abbreviations.length, i = L; i > 0; i--) {
-                var y = 3 * i;
-                if (Math.pow(10, y) <= value) {
-                    scale -= y;
-                    abbreviation = i - 1;
-                    break;
-                }
-            }
+            var sdigits, value0 = value, exponent = 0, scale = section.scale;
             if (section.scientific) {
                 sdigits = Math.floor(Math.log(value) / Math.LN10);
                 exponent = scale + sdigits - section.integer.digits + 1;
@@ -836,11 +777,11 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             }
             scale && (value = def.mult10(value, scale));
             value = def.round10(value, section.fractional.digits);
-            return !value && zeroFormat ? zeroFormat(style, value0) : numFormRt_formatSection(section, style, value, negativeMode, exponent, abbreviation);
+            return !value && zeroFormat ? zeroFormat(style, value0) : numFormRt_formatSection(section, style, value, negativeMode, exponent);
         }
         return numFormRt_formatSectionPosNeg;
     }
-    function numFormRt_formatSection(section, style, value, negativeMode, exponent, abbreviation) {
+    function numFormRt_formatSection(section, style, value, negativeMode, exponent) {
         var svalue = "" + value, idot = svalue.indexOf("."), itext = 0 > idot ? svalue : svalue.substr(0, idot), ftext = 0 > idot ? "" : svalue.substr(idot + 1);
         "0" === itext && (itext = "");
         exponent || (exponent = 0);
@@ -850,10 +791,10 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         ftext = ftext.split("");
         style.group && section.groupOn && numFormRt_addGroupSeparators(style, itext);
         section.integer.list.forEach(function(f) {
-            out.push(f(style, itext, exponent, abbreviation));
+            out.push(f(style, itext, exponent));
         });
         section.fractional.list.forEach(function(f) {
-            out.push(f(style, ftext, exponent, abbreviation));
+            out.push(f(style, ftext, exponent));
         });
         return out.join("");
     }
@@ -911,9 +852,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
     function numFormRt_currencySymbol(style) {
         return style.currency;
     }
-    function numForm_abbreviationSymbol(style, text, exponent, abbreviation) {
-        return null != abbreviation ? style.abbreviations[abbreviation] : void 0;
-    }
     function dateForm_tryConfigure(other) {
         return def.string.is(other) ? !!this.mask(other) : def.is(other, dateForm) ? !!this.mask(other.mask()) : void 0;
     }
@@ -953,44 +891,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
           case customForm:
             return !!this.any(other);
         }
-        if (def.string.is(other)) {
-            var formP = langProvider(other);
-            if (formP) return !!def.configure(this, formP);
-        }
-    }
-    function configLanguage(lang, config) {
-        lang = normalizeLanguageCode(lang);
-        var langStyle = def.getOwn(_languages, lang);
-        if (langStyle) def.configure(langStyle, config); else {
-            langStyle = _languages[lang] = formProvider(config);
-            langStyle.languageCode = lang;
-        }
-        return langStyle;
-    }
-    function parseLanguageCode(langCode) {
-        var re = /^([a-z]{2,8})(?:[-_]([a-z]{2}|\d{3}))?$/i, m = re.exec(langCode);
-        if (!m) return null;
-        var primary = m[1] ? m[1].toLowerCase() : "", region = m[2] ? m[2].toLowerCase() : "";
-        return {
-            code: primary + (region ? "-" + region : ""),
-            primary: primary,
-            region: region
-        };
-    }
-    function normalizeLanguageCode(langCode) {
-        return langCode ? langCode.toLowerCase() : "";
-    }
-    function getLanguage(langCode, fallback) {
-        langCode = normalizeLanguageCode(langCode);
-        var lang = def.getOwn(_languages, langCode);
-        if (lang) return lang;
-        if (!fallback) return null;
-        var norm = parseLanguageCode(langCode);
-        if (norm) {
-            if (norm.code !== langCode && (lang = def.getOwn(_languages, norm.code))) return lang;
-            if (norm.region && (lang = def.getOwn(_languages, norm.primary))) return lang;
-        }
-        return def.getOwn(_languages, _defaultLangCode, null);
     }
     var cdo = def.globalSpace("cdo", {});
     def.type("cdo.DimensionType").init(function(complexType, name, keyArgs) {
@@ -1989,7 +1889,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                 v = me._dimensionsList;
                 for (var i = 0, L = v.length; L > i; i++) v[i].dispose();
                 me._dimensions = null;
-                me._dimensionsList = null;
+                me._dimensionsLIst = null;
                 if (v = me.parent) {
                     v.removeChild(me);
                     me.parent = null;
@@ -3720,18 +3620,11 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             fractionPad: {
                 cast: String,
                 fail: def.falsy
-            },
-            abbreviations: {
-                fail: def.array.empty
             }
         },
         methods: {
             tryConfigure: function(other) {
-                if (def.is(other, numFormStyle)) return !!this.integerPad(other.integerPad()).fractionPad(other.fractionPad()).decimal(other.decimal()).group(other.group()).groupSizes(other.groupSizes()).negativeSign(other.negativeSign()).currency(other.currency()).abbreviations(other.abbreviations());
-                if (def.string.is(other)) {
-                    var formP = langProvider(other);
-                    if (formP) return !!def.configure(this, formP.number().style());
-                }
+                return def.is(other, numFormStyle) ? !!this.integerPad(other.integerPad()).fractionPad(other.fractionPad()).decimal(other.decimal()).group(other.group()).groupSizes(other.groupSizes()).negativeSign(other.negativeSign()).currency(other.currency()) : void 0;
             }
         }
     }, {
@@ -3744,7 +3637,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         decimal: ".",
         group: ",",
         groupSizes: [ 3 ],
-        abbreviations: [ "k", "m", "b", "t" ],
         negativeSign: "-",
         currency: "$"
     });
@@ -3811,19 +3703,9 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         return customFormat;
     };
     customForm.defaults = customForm().formatter(customForm_defaultFormatter);
-    var _defaultLangCode = "en-us", formProvider = cdo.format = function(config, proto) {
+    var formProvider = cdo.format = function(config, proto) {
         function formatProvider() {}
         formatProvider.tryConfigure = formProvider_tryConfigure;
-        var language;
-        if (!proto && def.string.is(config)) {
-            var formP = langProvider(config);
-            language = formP.languageCode;
-            if (formP) {
-                proto = formP;
-                config = null;
-            }
-        }
-        formatProvider.languageCode = language ? language : _defaultLangCode;
         def.classify(formatProvider, formProvider);
         def.instance(formatProvider, config, proto, {
             number: formProvider_field(numForm),
@@ -3841,61 +3723,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         percent: "#,0.#%",
         date: "%Y/%m/%d",
         any: customForm()
-    });
-    var _languages = {}, _currentProvider = _languages[_defaultLangCode] = formProvider.defaults, langProvider = cdo.format.language = function(style, config) {
-        var L = arguments.length;
-        if (!L) return _currentProvider;
-        if (1 == L) {
-            if (void 0 === style) throw def.error.operationInvalid("Undefined 'style' value.");
-            if (null === style || "" === style) style = _defaultLangCode; else {
-                if (def.is(style, formProvider)) return _currentProvider = style;
-                if ("object" == typeof style) {
-                    for (var key in style) configLanguage(key, def.getOwn(style, key));
-                    return cdo.format;
-                }
-            }
-            return getLanguage(style, !0);
-        }
-        if (2 == L) return configLanguage(style, config);
-        throw def.error.operationInvalid("Wrong number of arguments");
-    };
-    langProvider({
-        "en-gb": {
-            number: {
-                mask: "#,0.##",
-                style: {
-                    integerPad: "0",
-                    fractionPad: "0",
-                    decimal: ".",
-                    group: ",",
-                    groupSizes: [ 3 ],
-                    abbreviations: [ "k", "m", "b", "t" ],
-                    negativeSign: "-",
-                    currency: "£"
-                }
-            },
-            date: {
-                mask: "%d/%m/%Y"
-            }
-        },
-        "pt-pt": {
-            number: {
-                mask: "#,0.##",
-                style: {
-                    integerPad: "0",
-                    fractionPad: "0",
-                    decimal: ",",
-                    group: " ",
-                    groupSizes: [ 3 ],
-                    abbreviations: [ "k", "m", "b", "t" ],
-                    negativeSign: "-",
-                    currency: "€"
-                }
-            },
-            date: {
-                mask: "%d/%m/%Y"
-            }
-        }
     });
     return cdo;
 });

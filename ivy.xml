@@ -57,6 +57,10 @@
 			transitive="false" changing="true"/>
 		-->
 
+		<dependency org="javax.ws.rs" name="jsr311-api" rev="1.1.1"/>
+		<dependency org="org.mortbay.jetty" name="jetty-util" rev="6.1.26" />
+		<dependency org="com.sun.jersey" name="jersey-client" rev="0.9-ea" />
+		
 		<!-- internal pentaho platform dependencies -->
 		<dependency org="${pentaho-platform.group}" name="pentaho-platform-api" 
 			 rev="${dependency.bi-platform.revision}" changing="true" />
@@ -66,6 +70,8 @@
 			 rev="${dependency.bi-platform.revision}" changing="true" />
 		<dependency org="${pentaho-platform.group}" name="pentaho-platform-extensions" 
 			 rev="${dependency.bi-platform.revision}" changing="true" />
+		<!--  
+		-->
 
 		<dependency org="commons-collections" name="commons-collections" 
 			 rev="3.2.1"  changing="true" />
@@ -92,10 +98,12 @@
 		-->
 
 		<!--  test dependencies -->
+		<!--
 		<dependency org="${pentaho-platform.group}" 
 			name="pentaho-platform-core-test" 
 			rev="${dependency.bi-platform.revision}"  
 			changing="true" conf="test->default"/>
+		-->
 		<dependency org="junit" name="junit" rev="4.10" conf="test->default" />
 		<dependency org="hsqldb" name="hsqldb" rev="1.8.0" conf="test->default" transitive="false"/>
 

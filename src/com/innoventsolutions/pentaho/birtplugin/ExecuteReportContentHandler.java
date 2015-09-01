@@ -31,12 +31,14 @@ public class ExecuteReportContentHandler {
 	private final Map<String, Object> inputs;
 	private final Auditor auditor;
 	private final Configuration configuration;
+	private final RemoteFileManager remoteFileManager;
 
 	public ExecuteReportContentHandler(final Map<String, Object> inputs,
 			final Auditor auditor) {
 		this.inputs = inputs;
 		this.auditor = auditor;
 		this.configuration = new Configuration();
+		this.remoteFileManager = new RemoteFileManager(configuration);
 	}
 
 	public interface Auditor {
@@ -62,8 +64,6 @@ public class ExecuteReportContentHandler {
 		}
 		String result = MessageTypes.INSTANCE_END;
 		try {
-			final RemoteFileManager remoteFileManager = new RemoteFileManager(
-					configuration);
 			final String remoteFileId = remoteFileManager.registerFile(fileId);
 			if (remoteFileId != null) {
 				runReport(remoteFileId, outputStream);
@@ -118,6 +118,7 @@ public class ExecuteReportContentHandler {
 
 	private void runReport(final String remoteFileId,
 			final OutputStream outputStream) throws IOException {
+		remoteFileManager.uploadResources();
 		@SuppressWarnings("unused")
 		String outputType = null;
 		if (inputs.containsKey(OUTPUT_TYPE)) {

@@ -1,5 +1,5 @@
 /*!
-* Copyright 2002 - 2015 Webdetails, a Pentaho company.  All rights reserved.
+* Copyright 2002 - 2014 Webdetails, a Pentaho company.  All rights reserved.
 * 
 * This software was developed by Webdetails and is provided under the terms
 * of the Mozilla Public License, Version 2.0, or any later version. You may not use
@@ -10,6 +10,7 @@
 * basis, WITHOUT WARRANTY OF ANY KIND, either express or  implied. Please refer to
 * the license for the specific language governing your rights and limitations.
 */
+
 
 Dashboards.escapeHtml = function(input) {
   // Check if the input is already escaped. It assumes that, if there is an escaped char in the input then, 
@@ -50,7 +51,6 @@ Dashboards.getLocationSearchString = function() {
 
 (function (D) {
   var urlParams = undefined;
-  var formProvider = undefined;
 
   D.getQueryParameter = function(parameterName) {
     if ( urlParams === undefined ) {
@@ -59,61 +59,6 @@ Dashboards.getLocationSearchString = function() {
     }
     return urlParams[parameterName] || "";
 
-  };
-
-  /**
-   * Format a number with the given mask using the Dashboard language
-   * or the one that the user specified if it exists, otherwise
-   * uses the default language 'en-US'
-   *
-   * @param value
-   * @param mask
-   * @param langCode
-   * @returns {string} formatted number
-   */
-  D.numberFormat = function(value, mask, langCode) {
-    if(formProvider === undefined) {
-      formProvider = cdo.format.language().createChild();
-    }
-    if(langCode != undefined) {
-      return cdo.format.language(langCode).number().mask(mask)(value);
-    }
-
-    return formProvider.number().mask(mask)(value);
-  };
-
-  /**
-   * Config a new or existing language by specifying the language code
-   * and a configuration object with the keywords:
-   *  - 'number'     to configure number's format language
-   *  - 'dateLocale' to configure date's   format language
-   *
-   * @param langCode
-   * @param config
-   */
-  D.configLanguage = function(langCode, config) {
-    var dateConfig = config.dateLocale || {};
-    var mLocale = moment.locale();
-    delete config.dateLocale;
-
-    cdo.format.language(langCode, config);
-    moment.locale(langCode, dateConfig);
-    moment.locale(mLocale);
-  };
-
-  /**
-   * Format a date with a given mask
-   *
-   * @param mask
-   * @param date
-   * @returns {string} formatted date
-   */
-  D.dateFormat = function(mask, date) {
-    if(date != null && _.isFunction(date.format)) {
-      return date.format(mask);
-    }
-
-    return moment().format(mask);
   };
 
   // Conversion functions
@@ -150,10 +95,7 @@ Dashboards.getLocationSearchString = function() {
 
 })(Dashboards);
 
-(function(D) {
 
-
-})(Dashboards);
 
 
 /**

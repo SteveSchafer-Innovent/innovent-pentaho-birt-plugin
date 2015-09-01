@@ -161,10 +161,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
         }
         this.scene = scene;
     }
-    function SceneMetaType() {
-        def.MetaType.apply(this, arguments);
-        this._vars = def.create(this.baseType && this.baseType._vars);
-    }
     function scene_renderId(renderId) {
         if (this._renderId !== renderId) {
             this._renderId = renderId;
@@ -420,13 +416,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
     pvc.data = cdo;
     var pvc_arraySlice = Array.prototype.slice;
     pvc.invisibleFill = "rgba(127,127,127,0.00001)";
-    !function() {
-        var setTipsyDebug = function(level) {
-            pv.Behavior.tipsy.setDebug(level);
-        };
-        setTipsyDebug(def.debug);
-        def.addOnDebugChanged(setTipsyDebug);
-    }();
     def.global.NoDataException = function() {};
     def.global.InvalidDataException = function(msg) {
         this.message = msg ? msg : "Invalid Data.";
@@ -496,7 +485,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
     pvc.extensionTag = "extension";
     pvc.extendType = function(type, exts, names) {
         if (exts) {
-            var exts2, sceneVars = type.meta && type.meta._vars, addExtension = function(ext, n) {
+            var exts2, sceneVars = type.prototype._vars, addExtension = function(ext, n) {
                 if (void 0 !== ext) {
                     exts2 || (exts2 = {});
                     sceneVars && sceneVars[n] && (n = "_" + n + "EvalCore");
@@ -1668,7 +1657,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             if (me.selectableByClick()) {
                 var ev = me.event;
                 me.select({
-                    replace: !ev || !(ev.ctrlKey || ev.metaKey)
+                    replace: !ev || !ev.ctrlKey
                 });
             }
         },
@@ -1882,315 +1871,309 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             }
         });
     });
-    def.MetaType.subType(SceneMetaType, {
-        methods: {
-            variable: function(name, impl) {
-                var methods;
-                if (this._vars[name]) void 0 !== impl && (methods = def.set({}, "_" + name + "EvalCore", def.fun.to(impl))); else {
-                    this._vars[name] = !0;
-                    var instProto = this.Ctor.prototype;
-                    methods = {};
-                    var nameEval = "_" + name + "Eval";
-                    methods[name] = scene_createVarMainMethod(name, nameEval);
-                    var nameEvalCore = nameEval + "Core";
-                    def.hasOwn(instProto, nameEval) || (methods[nameEval] = def.methodCaller(nameEvalCore));
-                    def.hasOwn(instProto, nameEvalCore) || (methods[nameEvalCore] = def.fun.to(void 0 === impl ? null : impl));
-                }
-                methods && this.methods(methods);
-                return this;
-            }
+    def.type("pvc.visual.Scene").init(function(parent, keyArgs) {
+        def.debug >= 4 && (this.id = def.nextId("scene"));
+        this._renderId = 0;
+        this.renderState = {};
+        pv.Dom.Node.call(this, null);
+        this.parent = parent || null;
+        if (parent) {
+            this.root = parent.root;
+            var index = def.get(keyArgs, "index", null);
+            parent.insertAt(this, index);
+        } else {
+            this.root = this;
+            this._active = null;
+            this._panel = def.get(keyArgs, "panel") || def.fail.argumentRequired("panel", "Argument is required on root scene.");
         }
-    });
-    var pvc_Scene = SceneMetaType.Ctor;
-    def("pvc.visual.Scene", pvc_Scene.configure({
-        init: function(parent, keyArgs) {
-            def.debug >= 4 && (this.id = def.nextId("scene"));
-            this._renderId = 0;
-            this.renderState = {};
-            pv.Dom.Node.call(this, null);
-            this.parent = parent || null;
-            if (parent) {
-                this.root = parent.root;
-                var index = def.get(keyArgs, "index", null);
-                parent.insertAt(this, index);
+        var first, group, datum, datums, groups, atoms, firstAtoms, dataSource = def.array.to(def.get(keyArgs, "source"));
+        if (dataSource && dataSource.length) {
+            this.source = dataSource;
+            first = dataSource[0];
+            if (first instanceof cdo.Data) {
+                group = first;
+                groups = dataSource;
+                datum = group.firstDatum() || def.query(groups).select(function(g) {
+                    return g.firstDatum();
+                }).first(def.notNully);
             } else {
-                this.root = this;
-                this._active = null;
-                this._panel = def.get(keyArgs, "panel") || def.fail.argumentRequired("panel", "Argument is required on root scene.");
+                first instanceof cdo.Datum || def.assert("not a datum");
+                datum = first;
+                datums = dataSource;
             }
-            var first, group, datum, datums, groups, atoms, firstAtoms, dataSource = def.array.to(def.get(keyArgs, "source"));
-            if (dataSource && dataSource.length) {
-                this.source = dataSource;
-                first = dataSource[0];
-                if (first instanceof cdo.Data) {
-                    group = first;
-                    groups = dataSource;
-                    datum = group.firstDatum() || def.query(groups).select(function(g) {
-                        return g.firstDatum();
-                    }).first(def.notNully);
-                } else {
-                    first instanceof cdo.Datum || def.assert("not a datum");
-                    datum = first;
-                    datums = dataSource;
-                }
-                atoms = first.atoms;
-                firstAtoms = datum && datum.atoms || atoms;
-            } else atoms = firstAtoms = parent ? Object.create(parent.atoms) : {};
-            this.atoms = atoms;
-            this.firstAtoms = firstAtoms;
-            groups && (this.groups = groups);
-            group && (this.group = group);
-            datums && (this._datums = datums);
-            datum && (this.datum = datum);
-            (!first || first.isNull) && (this.isNull = !0);
-            this.vars = parent ? Object.create(parent.vars) : {};
+            atoms = first.atoms;
+            firstAtoms = datum && datum.atoms || atoms;
+        } else atoms = firstAtoms = parent ? Object.create(parent.atoms) : {};
+        this.atoms = atoms;
+        this.firstAtoms = firstAtoms;
+        groups && (this.groups = groups);
+        group && (this.group = group);
+        datums && (this._datums = datums);
+        datum && (this.datum = datum);
+        (!first || first.isNull) && (this.isNull = !0);
+        this.vars = parent ? Object.create(parent.vars) : {};
+    }).add(pv.Dom.Node).add(pvc.visual.Interactive).add({
+        source: null,
+        groups: null,
+        group: null,
+        _datums: null,
+        datum: null,
+        isNull: !1,
+        get: function(name, prop) {
+            var avar = this.vars[name];
+            return avar && avar[prop || "value"];
         },
-        methods: [ pv.Dom.Node, pvc.visual.Interactive, {
-            source: null,
-            groups: null,
-            group: null,
-            _datums: null,
-            datum: null,
-            isNull: !1,
-            get: function(name, prop) {
-                var avar = this.vars[name];
-                return avar && avar[prop || "value"];
-            },
-            getSeries: function() {
-                return this.get("series");
-            },
-            getCategory: function() {
-                return this.get("category");
-            },
-            getValue: function() {
-                return this.get("value");
-            },
-            getTick: function() {
-                return this.get("tick");
-            },
-            getX: function() {
-                return this.get("x");
-            },
-            getY: function() {
-                return this.get("y");
-            },
-            getColor: function() {
-                return this.get("color");
-            },
-            getSize: function() {
-                return this.get("size");
-            },
-            getSeriesLabel: function() {
-                return this.get("series", "label");
-            },
-            getCategoryLabel: function() {
-                return this.get("category", "label");
-            },
-            getValueLabel: function() {
-                return this.get("value", "label");
-            },
-            getTickLabel: function() {
-                return this.get("tick", "label");
-            },
-            getXLabel: function() {
-                return this.get("x", "label");
-            },
-            getYLabel: function() {
-                return this.get("y", "label");
-            },
-            getColorLabel: function() {
-                return this.get("color", "label");
-            },
-            getSizeLabel: function() {
-                return this.get("size", "label");
-            },
-            data: function() {
-                var data = this.group;
-                if (!data) {
-                    for (var scene = this; !data && (scene = scene.parent); ) data = scene.group;
-                    data || (data = this.panel.data);
-                }
-                return data;
-            },
-            allGroup: function() {
-                return 1 === this.groups.length ? this.group : this._allGroup || (this._allGroup = this._calcAllGroup());
-            },
-            _calcAllGroup: function() {
-                var groups = this.groups;
-                return new cdo.Data(groups && groups.length ? {
-                    linkParent: cdo.Data.lca(groups),
-                    datums: this.datums(),
-                    where: function(d) {
-                        return !!groups && groups.some(function(g) {
-                            return g.contains(d);
-                        });
-                    }
-                } : {
-                    linkParent: this.data(),
-                    datums: this.datums()
-                });
-            },
-            datums: function() {
-                return this.groups ? def.query(this.groups).selectMany(function(g) {
-                    return g.datums();
-                }) : this._datums ? def.query(this._datums) : def.query();
-            },
-            format: function(mask) {
-                return def.format(mask, this._formatScope, this);
-            },
-            _formatScope: function(prop) {
-                if ("#" === prop.charAt(0)) {
-                    prop = prop.substr(1).split(".");
-                    if (prop.length > 2) throw def.error.operationInvalid("Scene format mask is invalid.");
-                    var atom = this.firstAtoms[prop[0]];
-                    if (atom) {
-                        if (prop.length > 1) switch (prop[1]) {
-                          case "value":
-                            return atom.value;
-
-                          case "label":
-                            break;
-
-                          default:
-                            throw def.error.operationInvalid("Scene format mask is invalid.");
-                        }
-                        return atom;
-                    }
-                    return null;
-                }
-                return def.getPath(this.vars, prop);
-            },
-            isRoot: function() {
-                return this.root === this;
-            },
-            panel: function() {
-                return this.root._panel;
-            },
-            chart: function() {
-                return this.root._panel.chart;
-            },
-            compatVersion: function() {
-                return this.root._panel.compatVersion();
-            },
-            children: function() {
-                var cs = this.childNodes;
-                return cs.length ? def.query(cs) : def.query();
-            },
-            leafs: function() {
-                function getFirstLeafFrom(leaf) {
-                    for (;leaf.childNodes.length; ) leaf = leaf.childNodes[0];
-                    return leaf;
-                }
-                var root = this;
-                return def.query(function(nextIndex) {
-                    if (!nextIndex) {
-                        var item = getFirstLeafFrom(root);
-                        return item === root ? 0 : (this.item = item, 1);
-                    }
-                    var next = this.item.nextSibling;
-                    if (next) return this.item = next, 1;
-                    for (var current = this.item; current !== root && (current = current.parentNode); ) if (next = current.nextSibling) return this.item = getFirstLeafFrom(next), 
-                    1;
-                    return 0;
-                });
-            },
-            anyInteraction: function() {
-                return !!this.root._active || this.anySelected();
-            },
-            isActive: !1,
-            setActive: function(isActive) {
-                isActive = !!isActive;
-                this.isActive !== isActive && rootScene_setActive.call(this.root, this.isActive ? null : this);
-            },
-            clearActive: function() {
-                return rootScene_setActive.call(this.root, null);
-            },
-            anyActive: function() {
-                return !!this.root._active;
-            },
-            active: function() {
-                return this.root._active;
-            },
-            activeSeries: function() {
-                var seriesVar, active = this.active();
-                return active && (seriesVar = active.vars.series) ? seriesVar.value : void 0;
-            },
-            isActiveSeries: function() {
-                if (this.isActive) return !0;
-                var isActiveSeries = this.renderState.isActiveSeries;
-                if (null == isActiveSeries) {
-                    var activeSeries;
-                    isActiveSeries = void 0 !== (activeSeries = this.activeSeries()) && activeSeries === this.vars.series.value;
-                    this.renderState.isActiveSeries = isActiveSeries;
-                }
-                return isActiveSeries;
-            },
-            isActiveDatum: function() {
-                return this.isActive ? !0 : !1;
-            },
-            isActiveDescendantOrSelf: function() {
-                return this.isActive || def.lazy(this.renderState, "isActiveDescOrSelf", this._calcIsActiveDescOrSelf, this);
-            },
-            _calcIsActiveDescOrSelf: function() {
-                var scene = this.active();
-                if (scene) for (;scene = scene.parent; ) if (scene === this) return !0;
-                return !1;
-            },
-            isVisible: function() {
-                return this._visibleInfo().is;
-            },
-            anyVisible: function() {
-                return this._visibleInfo().any;
-            },
-            _visibleInfo: function() {
-                return def.lazy(this.renderState, "visibleInfo", this._createVisibleInfo, this);
-            },
-            _createVisibleInfo: function() {
-                var any = this.chart().data.owner.visibleCount() > 0, isSelected = any && this.datums().any(def.propGet("isVisible"));
-                return {
-                    any: any,
-                    is: isSelected
-                };
-            },
-            isSelected: function() {
-                return this._selectedInfo().is;
-            },
-            anySelected: function() {
-                return this._selectedInfo().any;
-            },
-            _selectedInfo: function() {
-                return def.lazy(this.renderState, "selectedInfo", this._createSelectedInfo, this);
-            },
-            _createSelectedInfo: function() {
-                var any = this.chart().data.owner.selectedCount() > 0, isSelected = any && this.datums().any(cdo.Datum.isSelected);
-                return {
-                    any: any,
-                    is: isSelected
-                };
-            },
-            select: function(ka) {
-                var me = this, datums = me.datums().array();
-                if (datums.length) {
-                    var chart = me.chart();
-                    chart._updatingSelections(function() {
-                        datums = chart._onUserSelection(datums);
-                        datums && datums.length && (chart.options.ctrlSelectMode && def.get(ka, "replace", !0) ? chart.data.replaceSelected(datums) : cdo.Data.toggleSelected(datums));
+        getSeries: function() {
+            return this.get("series");
+        },
+        getCategory: function() {
+            return this.get("category");
+        },
+        getValue: function() {
+            return this.get("value");
+        },
+        getTick: function() {
+            return this.get("tick");
+        },
+        getX: function() {
+            return this.get("x");
+        },
+        getY: function() {
+            return this.get("y");
+        },
+        getColor: function() {
+            return this.get("color");
+        },
+        getSize: function() {
+            return this.get("size");
+        },
+        getSeriesLabel: function() {
+            return this.get("series", "label");
+        },
+        getCategoryLabel: function() {
+            return this.get("category", "label");
+        },
+        getValueLabel: function() {
+            return this.get("value", "label");
+        },
+        getTickLabel: function() {
+            return this.get("tick", "label");
+        },
+        getXLabel: function() {
+            return this.get("x", "label");
+        },
+        getYLabel: function() {
+            return this.get("y", "label");
+        },
+        getColorLabel: function() {
+            return this.get("color", "label");
+        },
+        getSizeLabel: function() {
+            return this.get("size", "label");
+        },
+        data: function() {
+            var data = this.group;
+            if (!data) {
+                for (var scene = this; !data && (scene = scene.parent); ) data = scene.group;
+                data || (data = this.panel.data);
+            }
+            return data;
+        },
+        allGroup: function() {
+            return 1 === this.groups.length ? this.group : this._allGroup || (this._allGroup = this._calcAllGroup());
+        },
+        _calcAllGroup: function() {
+            var groups = this.groups;
+            return new cdo.Data(groups && groups.length ? {
+                linkParent: cdo.Data.lca(groups),
+                datums: this.datums(),
+                where: function(d) {
+                    return !!groups && groups.some(function(g) {
+                        return g.contains(d);
                     });
                 }
-            },
-            isSelectedDescendantOrSelf: function() {
-                return this.isSelected() || def.lazy(this.renderState, "isSelectedDescOrSelf", this._calcIsSelectedDescOrSelf, this);
-            },
-            _calcIsSelectedDescOrSelf: function() {
-                var child = this.firstChild;
-                if (child) do if (child.isSelectedDescendantOrSelf()) return !0; while (child = child.nextSibling);
-                return !1;
-            },
-            toggleVisible: function() {
-                cdo.Data.toggleVisible(this.datums()) && this.chart().render(!0, !0, !1);
+            } : {
+                linkParent: this.data(),
+                datums: this.datums()
+            });
+        },
+        datums: function() {
+            return this.groups ? def.query(this.groups).selectMany(function(g) {
+                return g.datums();
+            }) : this._datums ? def.query(this._datums) : def.query();
+        },
+        format: function(mask) {
+            return def.format(mask, this._formatScope, this);
+        },
+        _formatScope: function(prop) {
+            if ("#" === prop.charAt(0)) {
+                prop = prop.substr(1).split(".");
+                if (prop.length > 2) throw def.error.operationInvalid("Scene format mask is invalid.");
+                var atom = this.firstAtoms[prop[0]];
+                if (atom) {
+                    if (prop.length > 1) switch (prop[1]) {
+                      case "value":
+                        return atom.value;
+
+                      case "label":
+                        break;
+
+                      default:
+                        throw def.error.operationInvalid("Scene format mask is invalid.");
+                    }
+                    return atom;
+                }
+                return null;
             }
-        } ]
-    }));
+            return def.getPath(this.vars, prop);
+        },
+        isRoot: function() {
+            return this.root === this;
+        },
+        panel: function() {
+            return this.root._panel;
+        },
+        chart: function() {
+            return this.root._panel.chart;
+        },
+        compatVersion: function() {
+            return this.root._panel.compatVersion();
+        },
+        children: function() {
+            var cs = this.childNodes;
+            return cs.length ? def.query(cs) : def.query();
+        },
+        leafs: function() {
+            function getFirstLeafFrom(leaf) {
+                for (;leaf.childNodes.length; ) leaf = leaf.childNodes[0];
+                return leaf;
+            }
+            var root = this;
+            return def.query(function(nextIndex) {
+                if (!nextIndex) {
+                    var item = getFirstLeafFrom(root);
+                    return item === root ? 0 : (this.item = item, 1);
+                }
+                var next = this.item.nextSibling;
+                if (next) return this.item = next, 1;
+                for (var current = this.item; current !== root && (current = current.parentNode); ) if (next = current.nextSibling) return this.item = getFirstLeafFrom(next), 
+                1;
+                return 0;
+            });
+        },
+        anyInteraction: function() {
+            return !!this.root._active || this.anySelected();
+        },
+        isActive: !1,
+        setActive: function(isActive) {
+            isActive = !!isActive;
+            this.isActive !== isActive && rootScene_setActive.call(this.root, this.isActive ? null : this);
+        },
+        clearActive: function() {
+            return rootScene_setActive.call(this.root, null);
+        },
+        anyActive: function() {
+            return !!this.root._active;
+        },
+        active: function() {
+            return this.root._active;
+        },
+        activeSeries: function() {
+            var seriesVar, active = this.active();
+            return active && (seriesVar = active.vars.series) ? seriesVar.value : void 0;
+        },
+        isActiveSeries: function() {
+            if (this.isActive) return !0;
+            var isActiveSeries = this.renderState.isActiveSeries;
+            if (null == isActiveSeries) {
+                var activeSeries;
+                isActiveSeries = void 0 !== (activeSeries = this.activeSeries()) && activeSeries === this.vars.series.value;
+                this.renderState.isActiveSeries = isActiveSeries;
+            }
+            return isActiveSeries;
+        },
+        isActiveDatum: function() {
+            return this.isActive ? !0 : !1;
+        },
+        isActiveDescendantOrSelf: function() {
+            return this.isActive || def.lazy(this.renderState, "isActiveDescOrSelf", this._calcIsActiveDescOrSelf, this);
+        },
+        _calcIsActiveDescOrSelf: function() {
+            var scene = this.active();
+            if (scene) for (;scene = scene.parent; ) if (scene === this) return !0;
+            return !1;
+        },
+        isVisible: function() {
+            return this._visibleInfo().is;
+        },
+        anyVisible: function() {
+            return this._visibleInfo().any;
+        },
+        _visibleInfo: function() {
+            return def.lazy(this.renderState, "visibleInfo", this._createVisibleInfo, this);
+        },
+        _createVisibleInfo: function() {
+            var any = this.chart().data.owner.visibleCount() > 0, isSelected = any && this.datums().any(def.propGet("isVisible"));
+            return {
+                any: any,
+                is: isSelected
+            };
+        },
+        isSelected: function() {
+            return this._selectedInfo().is;
+        },
+        anySelected: function() {
+            return this._selectedInfo().any;
+        },
+        _selectedInfo: function() {
+            return def.lazy(this.renderState, "selectedInfo", this._createSelectedInfo, this);
+        },
+        _createSelectedInfo: function() {
+            var any = this.chart().data.owner.selectedCount() > 0, isSelected = any && this.datums().any(cdo.Datum.isSelected);
+            return {
+                any: any,
+                is: isSelected
+            };
+        },
+        select: function(ka) {
+            var me = this, datums = me.datums().array();
+            if (datums.length) {
+                var chart = me.chart();
+                chart._updatingSelections(function() {
+                    datums = chart._onUserSelection(datums);
+                    datums && datums.length && (chart.options.ctrlSelectMode && def.get(ka, "replace", !0) ? chart.data.replaceSelected(datums) : cdo.Data.toggleSelected(datums));
+                });
+            }
+        },
+        isSelectedDescendantOrSelf: function() {
+            return this.isSelected() || def.lazy(this.renderState, "isSelectedDescOrSelf", this._calcIsSelectedDescOrSelf, this);
+        },
+        _calcIsSelectedDescOrSelf: function() {
+            var child = this.firstChild;
+            if (child) do if (child.isSelectedDescendantOrSelf()) return !0; while (child = child.nextSibling);
+            return !1;
+        },
+        toggleVisible: function() {
+            cdo.Data.toggleVisible(this.datums()) && this.chart().render(!0, !0, !1);
+        }
+    }).type().add({
+        variable: function(name, impl) {
+            var methods;
+            this._vars || (this._vars = def.create(this.baseType && this.baseType._vars));
+            if (this._vars[name]) void 0 !== impl && (methods = def.set({}, "_" + name + "EvalCore", def.fun.to(impl))); else {
+                this._vars[name] = !0;
+                var instProto = this.Ctor.prototype;
+                methods = {};
+                var nameEval = "_" + name + "Eval";
+                methods[name] = scene_createVarMainMethod(name, nameEval);
+                var nameEvalCore = nameEval + "Core";
+                def.hasOwn(instProto, nameEval) || (methods[nameEval] = def.methodCaller(nameEvalCore));
+                def.hasOwn(instProto, nameEvalCore) || (methods[nameEvalCore] = def.fun.to(void 0 === impl ? null : impl));
+            }
+            methods && this.methods(methods);
+            return this;
+        }
+    }).inst();
     var pvc_ValueLabelVar = pvc.visual.ValueLabelVar = function(value, label, rawValue, absLabel) {
         this.value = value;
         this.label = label;
@@ -2240,9 +2223,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
         null == requireSingleDimension && (requireSingleDimension = requireContinuous);
         if (!requireIsDiscrete && def.get(keyArgs, "isMeasure")) {
             this.isMeasure = !0;
-            var isNormalized = def.get(keyArgs, "isNormalized");
-            (isNormalized || def.get(keyArgs, "isPercent")) && (this.isPercent = !0);
-            isNormalized && (this.isNormalized = !0);
+            def.get(keyArgs, "isPercent") && (this.isPercent = !0);
         }
         var valueType = def.get(keyArgs, "valueType", null);
         valueType !== this.valueType && (this.valueType = this.dimensionDefaults.valueType = valueType);
@@ -2254,7 +2235,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
         valueType: null,
         requireIsDiscrete: null,
         isMeasure: !1,
-        isNormalized: !1,
         isPercent: !1,
         defaultSourceRoleName: null,
         defaultDimensionName: null,
@@ -2878,11 +2858,12 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 });
             },
             _conciliateVisualRoles: function() {
+                function createError(msg, args) {
+                    return def.error.operationInvalid(def.format(msg, args));
+                }
                 var L = this.dataCells.length;
                 if (L > 1) {
-                    var otherRole, otherGrouping, possibleTraversalModes, traversalMode, otherTravMode, rootLabel, dimNamesKey, i, grouping = this._getBoundRoleGrouping(this.role), createError = function(msg, args) {
-                        return def.error.operationInvalid(def.format(msg, args));
-                    };
+                    var otherRole, otherGrouping, possibleTraversalModes, traversalMode, otherTravMode, rootLabel, dimNamesKey, i, grouping = this._getBoundRoleGrouping(this.role);
                     if ("discrete" === this.scaleType) {
                         possibleTraversalModes = this.role.traversalModes;
                         rootLabel = this.role.rootLabel;
@@ -2911,10 +2892,8 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     } else {
                         if (!grouping.lastDimensionType().isComparable) throw createError("The visual roles on axis '{0}', assumed continuous, should have 'comparable' groupings.", [ this.id ]);
                         for (i = 1; L > i; i++) {
-                            otherRole = this.dataCells[i].role;
-                            otherGrouping = this._getBoundRoleGrouping(otherRole);
+                            otherGrouping = this._getBoundRoleGrouping(this.dataCells[i].role);
                             if (this.scaleType !== axis_groupingScaleType(otherGrouping)) throw createError("The visual roles on axis '{0}', assumed continuous, should have scales of the same type.", [ this.id ]);
-                            if (this.role.isNormalized !== otherRole.isNormalized) throw createError("The visual roles on axis '{0}', assumed normalized, should be of the same type.", [ this.id ]);
                         }
                     }
                 }
@@ -3678,7 +3657,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                         this.pvPanel = this.pvPanel.add(pv.Panel);
                     }
                 } else this.pvPanel = this.parent.pvPanel.add(this.type);
-                this.pvPanel.isPointingBarrier = !0;
                 var pvBorderPanel = this.pvPanel, width = this.width - margins.width, height = this.height - margins.height;
                 pvBorderPanel.width(width).height(height);
                 def.debug >= 15 && (margins.width > 0 || margins.height > 0) && (this.isTopRoot ? this.pvRootPanel : this.parent.pvPanel).add(this.type).width(this.width).height(this.height).left(null != this.position.left ? this.position.left : null).right(null != this.position.right ? this.position.right : null).top(null != this.position.top ? this.position.top : null).bottom(null != this.position.bottom ? this.position.bottom : null).strokeStyle("orange").lineWidth(1).strokeDasharray("- .");
@@ -3788,13 +3766,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             this._children && this._children.forEach(function(c) {
                 c._onRenderEnd(animated);
             });
-            if (this.isTopRoot) {
-                var renderedCallback = this.chart.options.renderedCallback;
-                if (renderedCallback) {
-                    var context = this.context();
-                    renderedCallback.call(context, context.scene);
-                }
-            }
         },
         renderInteractive: function() {
             if (this.isVisible) {
@@ -4216,24 +4187,26 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             ka = Object.create(ka || {});
             ka.toggle = !1;
             var datums = this._getDatumsOnRubberBand(ev, ka);
-            if (datums && datums.length) {
+            if (datums) {
                 var chart = this.chart;
                 chart._updatingSelections(function() {
-                    datums = chart._onUserSelection(datums);
-                    if (datums && datums.length) {
-                        var clearBefore = !(ev.ctrlKey || ev.metaKey) && chart.options.ctrlSelectMode;
-                        if (clearBefore) {
-                            chart.data.owner.clearSelected();
-                            cdo.Data.setSelected(datums, !0);
-                        } else ka.toggle ? cdo.Data.toggleSelected(datums) : cdo.Data.setSelected(datums, !0);
-                    }
+                    var clearBefore = !ev.ctrlKey && chart.options.ctrlSelectMode;
+                    if (clearBefore) {
+                        chart.data.owner.clearSelected();
+                        cdo.Data.setSelected(datums, !0);
+                    } else ka.toggle ? cdo.Data.toggleSelected(datums) : cdo.Data.setSelected(datums, !0);
                 });
             }
         },
         _getDatumsOnRubberBand: function(ev, ka) {
             var datumMap = new def.Map();
             this._getDatumsOnRect(datumMap, this.rubberBand, ka);
-            return datumMap.values();
+            var datums = datumMap.values();
+            if (datums.length) {
+                datums = this.chart._onUserSelection(datums);
+                datums && !datums.length && (datums = null);
+            }
+            return datums;
         },
         _getDatumsOnRect: function(datumMap, rect, ka) {
             this._getOwnDatumsOnRect(datumMap, rect, ka);
@@ -4777,8 +4750,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 return itemScene.vars.font;
             }).textDecoration(function(itemScene) {
                 return itemScene.isOn() ? "" : "line-through";
-            }).cursor(function(itemScene) {
-                return itemScene.executable() ? "pointer" : "default";
             });
             def.debug >= 16 && pvLegendMarkerPanel.anchor("right").add(pv.Panel)[this.anchorLength()](0)[this.anchorOrthoLength()](0).fillStyle(null).strokeStyle(null).lineWidth(0).add(pv.Line).data(function(scene) {
                 var vars = scene.vars, labelBBox = pvc.text.getLabelBBox(Math.min(vars.labelWidthMax, vars.textSize.width), 2 * vars.textSize.height / 3, "left", "middle", 0, vars.textMargin), corners = labelBBox.source.points();
@@ -5108,9 +5079,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     return this.parent.height() / 2;
                 }).width(function() {
                     return this.parent.width();
-                }).lineWidth(1, extag).strokeStyle(sceneColorProp, extag).cursor(function(itemScene) {
-                    return itemScene.executable() ? "pointer" : "default";
-                });
+                }).lineWidth(1, extag).strokeStyle(sceneColorProp, extag);
                 rulePvProto && (rulePvBaseProto = rulePvProto.extend(rulePvBaseProto));
                 new pvc.visual.Rule(legendPanel, pvSymbolPanel, {
                     proto: rulePvBaseProto,
@@ -5137,9 +5106,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                         return !1;
                     }
                     return !0;
-                }, extag).cursor(function(itemScene) {
-                    return itemScene.executable() ? "pointer" : "default";
-                });
+                }, extag);
                 markerPvProto && (markerPvBaseProto = markerPvProto.extend(markerPvBaseProto));
                 new pvc.visual.Dot(legendPanel, pvSymbolPanel, {
                     proto: markerPvBaseProto,
@@ -5585,7 +5552,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             this.smallRowIndex = options.smallRowIndex;
         } else {
             this.root = this;
-            this._format = cdo.format.language().createChild();
+            this._format = cdo.format();
         }
         this.base();
         def.debug >= 3 && this.log.info("NEW CHART\n" + def.logSeparator.replace(/-/g, "=") + "\n  DebugLevel: " + def.debug);
@@ -5645,7 +5612,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             isRoot && isMultiChartOverflowRetry || this._processOptions();
             if (isRootInit) {
                 this._processDataOptions(this.options);
-                pvc.removeTipsyLegends();
                 this._checkNoDataI();
                 this._initChartVisualRoles();
             }
@@ -5871,9 +5837,10 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 this.useTextMeasureCache(function() {
                     try {
                         for (;;) {
-                            !this.isCreated || recreate ? this._create({
+                            !this.parent && this.isCreated && pvc.removeTipsyLegends();
+                            (!this.isCreated || recreate) && this._create({
                                 reloadData: reloadData
-                            }) : !this.parent && this.isCreated && pvc.removeTipsyLegends();
+                            });
                             this.basePanel.render({
                                 bypassAnimation: bypassAnimation,
                                 recreate: recreate
@@ -5919,9 +5886,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
         },
         animatingStart: function() {
             return this.basePanel.animatingStart();
-        },
-        animating: function() {
-            return !!this.basePanel && this.basePanel.animating();
         },
         isOrientationVertical: function(orientation) {
             return (orientation || this.options.orientation) === pvc.orientation.vertical;
@@ -7753,7 +7717,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     return panel.valuesVisible && panel.valuesMask ? new pvc.visual.ValueLabel(panel, anchorMark, keyArgs) : null;
                 },
                 isNeeded: function(panel) {
-                    return panel.valuesVisible && !!panel.valuesMask;
+                    return panel.valuesVisible && panel.valuesMask;
                 }
             }
         },
@@ -7838,8 +7802,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     p || (p = pvLabel.parent);
                     t = p.height() - (pvLabel.bottom() || 0);
                 }
-                var anchoredToShape, labelCenter = pv.Label.getPolygon(m.width, m.height, pvLabel.textAlign(), pvLabel.textBaseline(), pvLabel.textAngle(), pvLabel.textMargin()).center().plus(l, t);
-                anchoredToShape = anchoredToMark === pvLabel.parent ? new pv.Shape.Rect(0, 0, anchoredToMark.width(), anchoredToMark.height()) : anchoredToMark.getShape(anchoredToMark.scene, anchoredToMark.index);
+                var labelCenter = pv.Label.getPolygon(m.width, m.height, pvLabel.textAlign(), pvLabel.textBaseline(), pvLabel.textAngle(), pvLabel.textMargin()).center().plus(l, t), anchoredToShape = anchoredToMark.getShape(anchoredToMark.scene, pvLabel.index);
                 return anchoredToShape.containsPoint(labelCenter);
             },
             maybeOptimizeColorLegibility: function(scene, color, type) {
@@ -8671,7 +8634,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 this.extend(scale, "scale");
                 this._isScaleSetup = !0;
             }
-            if (scale.isNull) layoutInfo.axisSize = layoutInfo.desiredClientSize[this.anchorOrthoLength()] || 0; else {
+            if (scale.isNull) layoutInfo.axisSize = 0; else {
                 var a_length = this.anchorLength(), rangeInfo = this.axis.getScaleRangeInfo();
                 rangeInfo && (null != rangeInfo.value ? clientSize[a_length] = rangeInfo.value : null != rangeInfo.min && (clientSize[a_length] = Math.max(Math.min(clientSize[a_length], rangeInfo.max), rangeInfo.min)));
                 this._calcLayoutCore(layoutInfo);
@@ -9995,14 +9958,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             });
             return axesPaddings;
         },
-        _getContinuousVisibleExtentConstrained: function(axis, min, max) {
-            return "ortho" === axis.type && 1 == axis.role.isNormalized ? {
-                min: 0,
-                max: 100,
-                minLocked: !0,
-                maxLocked: !0
-            } : this.base(axis, min, max);
-        },
         _coordinateSmallChartsLayout: function(scopesByType) {
             this.base(scopesByType);
             var titleOrthoLen, titleSizeMax = 0, axisIds = null, sizesMaxByAxisId = {};
@@ -10655,7 +10610,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     isMeasure: !0,
                     isRequired: !0,
                     isPercent: this.option("Stacked"),
-                    isNormalized: this.option("ValuesNormalized"),
                     requireSingleDimension: !0,
                     requireIsDiscrete: !1,
                     valueType: Number,
@@ -10708,11 +10662,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             },
             ValuesAnchor: {
                 value: "center"
-            },
-            ValuesNormalized: {
-                resolve: "_resolveFull",
-                cast: "boolean",
-                "default": !1
             }
         }
     }));
@@ -10794,9 +10743,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 extensionId: "bar",
                 freePosition: !0,
                 wrapper: wrapper
-            }).lockDimensions().optional("visible", function(scene) {
-                return null != scene.getValue();
-            }).pvMark.antialias(function(scene) {
+            }).lockDimensions().pvMark.antialias(function(scene) {
                 if (widthNeedsAntialias) return !0;
                 var y = sceneOrthoScale(scene), h = null == y ? 0 : Math.abs(y - orthoZero);
                 return 1e-8 > h;
@@ -10848,7 +10795,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             }
         },
         _barVerticalMode: function() {
-            return this.plot.option("ValuesNormalized") ? "expand" : null;
+            return null;
         },
         _barDifferentialControl: function() {
             return null;
@@ -11546,7 +11493,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
     def.type("pvc.BarChart", pvc.BarAbstract).add({
         _allowV1SecondAxis: !0,
         _createPlotsInternal: function() {
-            this._createMainPlot();
+            this._addPlot(new pvc.visual.BarPlot(this));
             this.options.plot2 && this._addPlot(new pvc.visual.PointPlot(this, {
                 name: "plot2",
                 defaults: {
@@ -11556,9 +11503,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     DotsVisible: !0
                 }
             }));
-        },
-        _createMainPlot: function() {
-            this._addPlot(new pvc.visual.BarPlot(this));
         },
         _createPlotTrend: function() {
             this._addPlot(new pvc.visual.PointPlot(this, {
@@ -11594,14 +11538,39 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             }
         }
     });
-    def.type("pvc.NormalizedBarChart", pvc.BarChart).add({
-        _createMainPlot: function() {
-            this._addPlot(new pvc.visual.BarPlot(this, {
-                fixed: {
-                    ValuesNormalized: !0,
-                    Stacked: !0
-                }
-            }));
+    def("pvc.visual.NormalizedBarPlot", pvc.visual.BarPlotAbstract.extend({
+        methods: {
+            type: "nbar"
+        },
+        options: {
+            Stacked: {
+                resolve: null,
+                value: !0
+            }
+        }
+    }));
+    pvc.visual.Plot.registerClass(pvc.visual.NormalizedBarPlot);
+    def.type("pvc.NormalizedBarPanel", pvc.BarAbstractPanel).init(function(chart, parent, plot, options) {
+        this.base(chart, parent, plot, options);
+        chart.barChartPanel || (chart.barChartPanel = this);
+    }).add({
+        plotType: "nbar",
+        _barVerticalMode: function() {
+            return "expand";
+        }
+    });
+    pvc.PlotPanel.registerClass(pvc.NormalizedBarPanel);
+    def.type("pvc.NormalizedBarChart", pvc.BarAbstract).add({
+        _getContinuousVisibleExtentConstrained: function(axis, min, max) {
+            return "ortho" === axis.type ? {
+                min: 0,
+                max: 100,
+                minLocked: !0,
+                maxLocked: !0
+            } : this.base(axis, min, max);
+        },
+        _createPlotsInternal: function() {
+            this._addPlot(new pvc.visual.NormalizedBarPlot(this));
         }
     });
     pvc.parseWaterDirection = function(value) {
@@ -11692,10 +11661,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             Stacked: {
                 resolve: null,
                 value: !0
-            },
-            ValuesNormalized: {
-                resolve: null,
-                value: !1
             },
             TotalLineLabel: {
                 resolve: "_resolveFull",
@@ -12069,11 +12034,11 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     return v1f.call(pseudo, d);
                 };
             });
-            var sceneNotNullProp = function(scene) {
-                return !scene.isNull;
-            }, sceneNotNullOrIntermProp = function(scene) {
+            var lineAreaVisibleProp = isBaseDiscrete && isStacked ? function(scene) {
                 return !scene.isNull || scene.isIntermediate;
-            }, areaVisibleProp = isBaseDiscrete && isStacked ? sceneNotNullOrIntermProp : sceneNotNullProp, isLineAreaNoSelect = chart.selectableByFocusWindow();
+            } : function(scene) {
+                return !scene.isNull;
+            }, isLineAreaNoSelect = chart.selectableByFocusWindow();
             this.pvArea = new pvc.visual.Area(this, this.pvScatterPanel, {
                 extensionId: "area",
                 noTooltip: !1,
@@ -12083,7 +12048,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 showsSelection: !isLineAreaNoSelect
             }).lockMark("data", function(seriesScene) {
                 return seriesScene.childNodes;
-            }).lockMark("visible", areaVisibleProp).override("x", function(scene) {
+            }).lockMark("visible", lineAreaVisibleProp).override("x", function(scene) {
                 return scene.basePosition;
             }).override("y", function(scene) {
                 return scene.orthoPosition;
@@ -12101,7 +12066,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             this._applyV1BarSecondExtensions && extensionIds.push({
                 abs: "barSecondLine"
             });
-            var lineVisibleProp = dotsVisibleOnly ? !1 : isBaseDiscrete && isStacked && areasVisible ? sceneNotNullOrIntermProp : sceneNotNullProp, noLineInteraction = areasVisible && !linesVisible;
+            var lineVisibleProp = !dotsVisibleOnly && lineAreaVisibleProp, noLineInteraction = areasVisible && !linesVisible;
             this.pvLine = new pvc.visual.Line(this, this.pvArea.anchor(this.anchorOpposite(anchor)), {
                 extensionId: extensionIds,
                 freePosition: !0,
@@ -12223,14 +12188,16 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 toScene.isSingle = !1;
             }
             function createIntermediateScene(seriesScene, fromScene, toScene, toChildIndex, belowScene) {
-                var interValue, interAccValue, interBasePosition, interIsNull = fromScene.isNull || toScene.isNull, areasVisible = this.areasVisible;
+                var interIsNull = fromScene.isNull || toScene.isNull;
+                if (interIsNull && !this.areasVisible) return null;
+                var interValue, interAccValue, interBasePosition;
                 if (interIsNull) {
-                    if (areasVisible && belowScene && isBaseDiscrete) {
+                    if (belowScene && isBaseDiscrete) {
                         var belowValueVar = belowScene.vars.value;
                         interAccValue = belowValueVar.accValue;
                         interValue = belowValueVar[valueRole.name];
                     } else interValue = interAccValue = orthoNullValue;
-                    interBasePosition = areasVisible ? isStacked && isBaseDiscrete ? toScene.basePosition - sceneBaseScale.range().step / 2 : fromScene.isNull ? toScene.basePosition : fromScene.basePosition : (toScene.basePosition + fromScene.basePosition) / 2;
+                    interBasePosition = isStacked && isBaseDiscrete ? toScene.basePosition - sceneBaseScale.range().step / 2 : fromScene.isNull ? toScene.basePosition : fromScene.basePosition;
                 } else {
                     var fromValueVar = fromScene.vars.value, toValueVar = toScene.vars.value;
                     interValue = (toValueVar.value + fromValueVar.value) / 2;
@@ -12257,6 +12224,20 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 interScene.orthoLength = orthoScale(interAccValue) - orthoZero;
                 colorVarHelper.onNewScene(interScene, !0);
                 return interScene;
+            }
+            function trimNullSeriesScenes(seriesScene) {
+                for (var scene, siblingScene, seriesScenes = seriesScene.childNodes, L = seriesScenes.length; L && (scene = seriesScenes[0]).isNull; ) {
+                    siblingScene = scene.nextSibling;
+                    if (siblingScene && !siblingScene.isNull) break;
+                    seriesScene.removeAt(0);
+                    L--;
+                }
+                for (;L && (scene = seriesScenes[L - 1]).isNull; ) {
+                    siblingScene = scene.previousSibling;
+                    if (siblingScene && !siblingScene.isNull) break;
+                    seriesScene.removeAt(L - 1);
+                    L--;
+                }
             }
             var rootScene = new pvc.visual.Scene(null, {
                 panel: this,
@@ -12296,8 +12277,9 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                     serCatScene.isIntermediate = !1;
                 }, this);
             }, this);
-            var belowSeriesScenes2;
-            rootScene.children().reverse().each(completeSeriesScenes, this);
+            var belowSeriesScenes2, reversedSeriesScenes = rootScene.children().reverse().array();
+            reversedSeriesScenes.forEach(completeSeriesScenes, this);
+            reversedSeriesScenes.forEach(trimNullSeriesScenes, this);
             return rootScene;
         }
     });
@@ -13051,10 +13033,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             var label = pvc.visual.ValueLabel.maybeCreate(me, me.pvHeatGrid, {
                 wrapper: wrapper
             });
-            if (label) {
-                me.pvHeatGridLabel = label.pvMark;
-                me.useShapes && label.override("getAnchoredToMark", def.fun.constant(me.shapes));
-            }
+            label && (me.pvHeatGridLabel = label.pvMark);
         },
         _calcCellSize: function() {
             var xScale = this.axes.x.scale, yScale = this.axes.y.scale, w = (xScale.max - xScale.min) / xScale.domain().length, h = (yScale.max - yScale.min) / yScale.domain().length;

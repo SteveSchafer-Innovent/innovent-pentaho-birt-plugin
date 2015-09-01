@@ -141,7 +141,7 @@ pen.define("cdf/lib/CCC/tipsy", [ "cdf/lib/CCC/protovis", "cdf/jquery", "cdf/lib
                         value: value
                     };
                 }
-                if (this !== $fakeTipTarget[0]) throw new Error("Assertion failed.");
+                this === $fakeTipTarget[0] || def.assert();
                 var $win = $(window), scrollOffset = {
                     width: $win.scrollLeft(),
                     height: $win.scrollTop()
@@ -181,7 +181,7 @@ pen.define("cdf/lib/CCC/tipsy", [ "cdf/lib/CCC/protovis", "cdf/jquery", "cdf/lib
                 });
             }
             function createTipsy(mark) {
-                _tip.debug >= 20 && _tip.log("[TIPSY] #" + _tipsyId + " Creating");
+                _tip.debug >= 20 && _tip.log("[TIPSY] #" + _tipsyId + " Creating _id=" + _id);
                 var c = mark.root.canvas();
                 $canvas = $(c);
                 c.style.position = "relative";
@@ -191,8 +191,10 @@ pen.define("cdf/lib/CCC/tipsy", [ "cdf/lib/CCC/protovis", "cdf/jquery", "cdf/lib
                 _id || (_id = "tipsyPvBehavior_" + new Date().getTime());
                 var fakeTipTarget = document.getElementById(_id);
                 if (!fakeTipTarget) {
+                    _tip.debug >= 20 && _tip.log("[TIPSY] #" + _tipsyId + " Creating Fake Tip Target=" + _id);
                     fakeTipTarget = document.createElement("div");
                     fakeTipTarget.id = _id;
+                    fakeTipTarget.className = "fakeTipsyTarget";
                     c.appendChild(fakeTipTarget);
                 }
                 var fakeStyle = fakeTipTarget.style;
@@ -218,16 +220,16 @@ pen.define("cdf/lib/CCC/tipsy", [ "cdf/lib/CCC/protovis", "cdf/jquery", "cdf/lib
                 if (_sharedTipsyInfo) {
                     var createId = $canvas[0].$pvCreateId || 0;
                     if (_sharedTipsyInfo.createId === createId) {
-                        _sharedTipsyInfo.behaviors.push(hideTipsyOther);
+                        _sharedTipsyInfo.behaviors.push(disposeTipsy);
                         return;
                     }
-                    _sharedTipsyInfo.behaviors.forEach(function(hideTipsyFun) {
-                        hideTipsyFun();
+                    _sharedTipsyInfo.behaviors.forEach(function(dispose) {
+                        dispose();
                     });
                 }
                 _sharedTipsyInfo = {
                     createId: $canvas[0].$pvCreateId || 0,
-                    behaviors: [ hideTipsyOther ]
+                    behaviors: [ disposeTipsy ]
                 };
                 $canvas.data("tipsy-pv-shared-info", _sharedTipsyInfo);
             }
@@ -290,8 +292,8 @@ pen.define("cdf/lib/CCC/tipsy", [ "cdf/lib/CCC/protovis", "cdf/jquery", "cdf/lib
                     _tip.debug >= 20 && _tip.log("[TIPSY] #" + _tipsyId + " " + (targetElem ? "Changing target element " + targetElem.tagName + "." : "Clearing target element."));
                     if (changedTargetElem) {
                         if ($targetElem) {
-                            $targetElem.unbind("mousemove", onTargetElemMouseMove);
-                            $targetElem.unbind("mouseleave", hideTipsy);
+                            $targetElem.off("mousemove", onTargetElemMouseMove);
+                            $targetElem.off("mouseleave", hideTipsy);
                         }
                         $targetElem = targetElem ? $(targetElem) : null;
                     }
@@ -335,6 +337,22 @@ pen.define("cdf/lib/CCC/tipsy", [ "cdf/lib/CCC/protovis", "cdf/jquery", "cdf/lib
                 }, _delayOut); else {
                     _tip.debug >= 20 && _tip.log("[TIPSY] #" + _tipsyId + " Hiding Immediately opId=" + opId);
                     hideTipsyCore(opId);
+                }
+            }
+            function disposeTipsy() {
+                _tip.debug >= 20 && _tip.log("[TIPSY] #" + _tipsyId + " Disposing");
+                hideTipsyOther();
+                if ($fakeTipTarget) {
+                    $fakeTipTarget.data("tipsy", null);
+                    $fakeTipTarget.each(function(elem) {
+                        elem.$tooltipOptions = null;
+                    });
+                    $fakeTipTarget.remove();
+                    $fakeTipTarget = null;
+                }
+                if ($canvas) {
+                    $canvas.off("mouseleave", hideTipsy);
+                    $canvas = null;
                 }
             }
             function hideTipsyOther() {

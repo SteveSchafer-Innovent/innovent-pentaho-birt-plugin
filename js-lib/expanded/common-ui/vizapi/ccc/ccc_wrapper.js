@@ -16,9 +16,9 @@
 */
 
 define([
-        "cdf/lib/CCC/def",
-        "cdf/lib/CCC/pvc-d1.0",
-        "cdf/lib/CCC/protovis",
+        "cdf-legacy/lib/CCC/def",
+        "cdf-legacy/lib/CCC/pvc-d1.0",
+        "cdf-legacy/lib/CCC/protovis",
         "common-ui/vizapi/VizController",
         "common-ui/vizapi/ccc/ccc_analyzer_plugin" // TODO: temporary dependency due to debug loading time problems
     ],
@@ -65,7 +65,7 @@ function(def, pvc, pv){
                 name: 'Default',
                 reqs: def.array.appendMany(
                     createDataReq('VERTICAL_BAR', {options: false}),
-                    [ createColumnDataLabelsReq({separator: false, anchors:['none', 'center', 'inside_end', 'inside_base', 'outside_end']}) ],                    
+                    [ createColumnDataLabelsReq({separator: false, anchors:['none', 'center', 'inside_end', 'inside_base', 'outside_end']}) ],
                     createTrendsDataReqs({separator: true}),
                     [ createChartOptionsDataReq(true) ])
             }],
@@ -102,7 +102,7 @@ function(def, pvc, pv){
                 name: 'Default',
                 reqs: def.array.appendMany(
                     createDataReq('HORIZONTAL_BAR', {options: false}),
-                    [ createColumnDataLabelsReq({separator: false, anchors:['none', 'center', 'inside_end', 'inside_base', 'outside_end']}) ],                    
+                    [ createColumnDataLabelsReq({separator: false, anchors:['none', 'center', 'inside_end', 'inside_base', 'outside_end']}) ],
                     [ createChartOptionsDataReq(true) ])
             }],
             menuOrdinal: 130,
@@ -186,7 +186,7 @@ function(def, pvc, pv){
                      createLineWidthDataReq()
                     ],
                     createTrendsDataReqs(),
-                    [ 
+                    [
                      createChartOptionsDataReq(true)
                     ]
                 )
@@ -311,7 +311,7 @@ function(def, pvc, pv){
                         createMeaDataReq('VERTICAL_BAR_LINE_NUMLINE'),
                         'id', 'measuresLine',
                         'required', false),
-                    
+
                     createColumnDataLabelsReq({value_anchor: 'VALUE_COLUMN_ANCHOR',   separator: false, anchors:['none', 'center', 'inside_end', 'inside_base', 'outside_end']}),
                     createLabelsVisibleAnchorDataReq({labels_option: 'lineLabelsOption', value_anchor: 'VALUE_LINE_ANCHOR'}),
                     createMultiDataReq(),
@@ -405,7 +405,7 @@ function(def, pvc, pv){
                 name: 'Default',
                 drillOrder: ['rows','columns'],
                 hyperlinkOrder: ['rows','columns'],
-                reqs : def.array.appendMany(                    
+                reqs : def.array.appendMany(
                     createDataReq("MULTIPLE_PIE", {multi: false, options: false}),
                     [
                         createLabelsVisiblePositionDataReq(),
@@ -559,7 +559,7 @@ function(def, pvc, pv){
                           caption: dropZoneLabel('SUNBURST_SIZE'),
                           required: false,
                           allowMultiple: false
-                      },                      
+                      },
                       createMultiDataReq()],
                       [createLabelsVisibleAnchorDataReq({ hideOptions : ['left', 'right', 'top', 'bottom'] })],
                       createSortDataReqs(true),
@@ -805,7 +805,7 @@ function(def, pvc, pv){
                     }
                 }
             }
-            
+
             return {
                     id: def.get(keyArgs, 'labels_option', 'labelsOption'),
                     dataType: 'string',
@@ -818,11 +818,11 @@ function(def, pvc, pv){
                     }
                 };
         }
-        
+
         function createColumnDataLabelsReq(keyArgs){
-          
+
             var anchors = def.get(keyArgs, 'anchors');
-          
+
             return {
                 id: 'labelsOption',
                 dataType: 'string',
@@ -846,11 +846,11 @@ function(def, pvc, pv){
                     group: 'options',
                     type:  'checkbox',
                     seperator: def.get(keyArgs, 'separator', true),
-                    caption: 'Labels' // TODO i18n pending....                
+                    caption: 'Labels' // TODO i18n pending....
                 }
             };
         }
-        
+
         function createChartOptionsDataReq(hasSeparator){
             return {
                 id: "optionsBtn",
@@ -1388,8 +1388,19 @@ function(def, pvc, pv){
                     }
 
                     var suffix;
-                    if(complex.isInterpolated){
-                        suffix = this.chart._message('chartTooltipGemInterp_' + complex.interpolation);
+
+                    // It can happen that the scene has more than one datum.
+                    // One is a null one and the other an interpolated one.
+                    // We may receive the null one in `complex` and
+                    // miss detecting that the scene is actually interpolated.
+                    if(context && context.scene) {
+                    	// create local variable for avoid double call datums()
+                    	var datums = context.scene.datums();
+                    	if (datums) {
+                    		var complexInterp = datums.where(function(d) { return d.isInterpolated && d.interpDimName === cccDimName; }).first();
+                    		if(complexInterp)
+                    			suffix = this.chart._message('chartTooltipGemInterp_' + complexInterp.interpolation);
+                    		}
                     } else if(complex.isTrend/* && atom.label*/){
                         // TODO: "atom.label" -- is a weak test for trended measures,
                         // that relies on the fact that non-trended measures are left null
@@ -1427,9 +1438,9 @@ function(def, pvc, pv){
                     visRoles = context.panel.visualRolesOf(cccDimName, /*includeChart*/true);
 
                 if(visRoles && visRoles.some(function(r) { return r.isPercent; })) {
-                    var group = context.scene.group, 
-                        dim   = (group || data).dimensions(cccDimName), 
-                        pct   = group 
+                    var group = context.scene.group,
+                        dim   = (group || data).dimensions(cccDimName),
+                        pct   = group
                             ? dim.percentOverParent({visible: true})
                             : dim.percent(atom.value);
 
@@ -1656,6 +1667,18 @@ function(def, pvc, pv){
         _discreteColorRole: 'columns',
 
         /* PLUGIN INTERFACE  */
+
+        dispose: function() {
+           this._element =
+           this.options  =
+           this.controller =
+           this._vizOptions = null;
+
+           if(this._chart && this._chart.dispose) {
+            this._chart.dispose();
+            this._chart = null;
+           }
+        },
 
         /**
          * Instructs the visualization to draw itself with
@@ -2382,8 +2405,8 @@ function(def, pvc, pv){
                                         }
 
                                         // Copy map values to ColorMap
-                                        // All color maps are joined together and there will be no 
-                                        // value collisions because the key is prefixed with the name 
+                                        // All color maps are joined together and there will be no
+                                        // value collisions because the key is prefixed with the name
                                         // of the category
                                         for (var j in map) {
                                             colorMap[j] = map[j];
@@ -2391,11 +2414,11 @@ function(def, pvc, pv){
                                     }
                                 }
                             } else {
-                                colorMap = memberPalette[colorGems[C - 1].formula];    
+                                colorMap = memberPalette[colorGems[C - 1].formula];
                             }
                         } else {
                             // Use measures (M === 1)
-                            
+
                             /*
                              * "[Measures].[MeasuresLevel]": {
                              *    "[MEASURE:0]": "violet",
@@ -2449,11 +2472,11 @@ function(def, pvc, pv){
                                         var keys     = compKey.split("~"),
                                             level    = keys.length - 1,
                                             keyLevel = keys[level];
-                                        
+
                                         // Obtain color for most specific key from color map.
                                         // If color map has no color and it is the 1st level,
                                         //  then reserve a color from the default color scale.
-                                        // Otherwise, return undefined, 
+                                        // Otherwise, return undefined,
                                         //  meaning that a derived color should be used.
                                         return def.getOwn(colorMap, keyLevel) ||
                                             (level ? undefined : defaultScale(keyLevel));
@@ -3294,12 +3317,12 @@ function(def, pvc, pv){
 
             configureColumnLabelsAlignmentOptions.call(this);
         },
-        
+
         _readUserOptions: function(options, vizOptions) {
             this.base(options, vizOptions);
             options.valuesFont = defaultFont(readFont(vizOptions, 'label'));
             options.extensionPoints.label_textStyle = vizOptions.labelColor;
-        }        
+        }
     });
 
     // -------------------
@@ -3427,7 +3450,7 @@ function(def, pvc, pv){
 
             options.plot2ValuesFont = defaultFont(readFont(vizOptions, 'label'));
             options.extensionPoints.plot2Label_textStyle = vizOptions.labelColor;
-            
+
             configureLabelsOptions.call(this);
         },
 
@@ -3447,7 +3470,7 @@ function(def, pvc, pv){
             this._configureAxisTitle('ortho2',"");
 
             this.options.plot2OrthoAxis = 2;
-            
+
             configureLineLabelsAlignmentOptions.call(this);
 
             // Plot2 uses same color scale
@@ -3487,7 +3510,7 @@ function(def, pvc, pv){
                 options.dotsVisible = true;
                 options.extensionPoints.dot_shape = shape;
             }
-            
+
             options.valuesFont = defaultFont(readFont(vizOptions, 'label'));
             options.extensionPoints.label_textStyle = vizOptions.labelColor;
 
@@ -3608,7 +3631,7 @@ function(def, pvc, pv){
 
             configureLabelsAnchorOptions.call(this);
         },
-        
+
         _readUserOptions: function(options, vizOptions) {
             this.base(options, vizOptions);
             options.valuesFont = defaultFont(readFont(vizOptions, 'label'));
@@ -3975,7 +3998,7 @@ function(def, pvc, pv){
             // configure value label
             if(this.options.valuesVisible){
                 this._configureValuesMask();
-            }            
+            }
         },
 
         _showLegend: function(){
@@ -4215,14 +4238,14 @@ function(def, pvc, pv){
                         var th = m.height * 0.85, // tight text bounding box
                             tb = pvLabel.textBaseline(),
                             // The effective height of text that must be covered.
-                            // one text margin, for the anchor, 
+                            // one text margin, for the anchor,
                             // half text margin for the anchor's opposite side.
                             // All on only one of the sides of the wedge.
                             thEf = 2 * (th + 3*tm/2);
 
                         // Minimum inner radius whose straight-arc has a length `thEf`
                         irmin = Math.max(
-                            irmin, 
+                            irmin,
                             thEf / (2 * Math.tan(a / 2)));
                     }
 
@@ -4240,7 +4263,7 @@ function(def, pvc, pv){
                     // Continue with normal processing for the main label.
                     return null;
                 };
-                
+
                 var me = this;
                 eps.label_add = function() {
                     return new pv.Label()
@@ -4250,8 +4273,8 @@ function(def, pvc, pv){
                         })
                         .text(function(scene) {
                             var pvMainLabel = this.proto;
-                            return !pvMainLabel.text() 
-                                ? "" 
+                            return !pvMainLabel.text()
+                                ? ""
                                 : me._formatSize(scene.vars.size, scene.firstAtoms.size.dimension);
                         })
                         .textBaseline("top");
@@ -4514,13 +4537,13 @@ function(def, pvc, pv){
 
         // Set Values Visible
         if(this._vizOptions.labelsVisible) {
-            this.options.valuesVisible = this._vizOptions.labelsVisible;    
+            this.options.valuesVisible = this._vizOptions.labelsVisible;
         }
 
         if (this._vizOptions.labelsAnchor) {
-            this.options.valuesAnchor = this._vizOptions.labelsAnchor;    
+            this.options.valuesAnchor = this._vizOptions.labelsAnchor;
         }
-        
+
         if (this._vizOptions.labelsTextAlign) {
              if (!this.options.extensionPoints) {
                 this.options.extensionPoints = {};
@@ -4537,7 +4560,7 @@ function(def, pvc, pv){
 
         if(!this._vizOptions.labelsOption || this._vizOptions.labelsOption == 'none') {
             return this.options.valuesVisible = false;
-        } 
+        }
 
         return this.options.valuesVisible = true;
     }
@@ -4549,7 +4572,7 @@ function(def, pvc, pv){
         }
     }
 
-    
+
     function configureColumnLabelsAlignmentOptions() {
         if (configureLabelsVisibilityOptions.call(this)) {
             if (!this.options.extensionPoints) {
@@ -4559,7 +4582,7 @@ function(def, pvc, pv){
             var labelsOption = this._vizOptions.labelsOption;
 
             this.options.extensionPoints.label_textMargin = 7;
-            
+
             if(labelsOption == 'center') {
                 this.options.valuesAnchor = 'center';
             }
@@ -4588,7 +4611,7 @@ function(def, pvc, pv){
             }
         }
     }
-    
+
     function configureLineLabelsAlignmentOptions() {
         var lineLabelsOption = this._vizOptions.lineLabelsOption;
         if(lineLabelsOption && lineLabelsOption != 'none') {

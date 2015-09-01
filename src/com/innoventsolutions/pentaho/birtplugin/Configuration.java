@@ -9,6 +9,7 @@ public class Configuration {
 	private final String username;
 	private final String password;
 	private final URI uri;
+	private final String resourceDir;
 
 	public Configuration() {
 		// TODO think of a better way to store configuration parameters
@@ -19,8 +20,9 @@ public class Configuration {
 				.getProperty("com.innoventsolutions.bmr.password");
 		final String uriString = properties
 				.getProperty("com.innoventsolutions.bmr.uri");
-		final URI uri = UriBuilder.fromUri(uriString).build();
-		this.uri = uri;
+		this.uri = UriBuilder.fromUri(uriString).build();
+		this.resourceDir = properties
+				.getProperty("com.innoventsolutions.bmr.resource-dir");
 	}
 
 	public String getUsername() {
@@ -33,5 +35,9 @@ public class Configuration {
 
 	public URI getUri() {
 		return uri;
+	}
+
+	public String getResourceDir() {
+		return resourceDir;
 	}
 }

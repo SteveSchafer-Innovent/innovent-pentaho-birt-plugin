@@ -26,7 +26,7 @@
 
 /*! Copyright 2010 Stanford Visualization Group, Mike Bostock, BSD license. */
 
-/*! b3bcf01fff70f1fcad2464fa4a700c22f9ed4596 */
+/*! 0a846e02116638f4d7f3c88a223ee1ae23f0cb3f */
 
 /*
  * TERMS OF USE - EASING EQUATIONS
@@ -5188,17 +5188,22 @@ pen.define("cdf/lib/CCC/protovis", function() {
             id: pv.id(),
             value: v,
             type: type,
-            tag: tag
-        }, specified = propertiesMap[name];
+            tag: tag,
+            proto: null,
+            root: null,
+            _proto: null
+        };
+        p.root = p;
+        var existing = propertiesMap[name];
         propertiesMap[name] = p;
-        if (specified) for (var i = 0, P = properties.length; P > i; i++) if (properties[i] === specified) {
+        if (existing) for (var i = 0, P = properties.length; P > i; i++) if (properties[i] === existing) {
             properties.splice(i, 1);
             break;
         }
         properties.push(p);
-        if (chain && specified && 3 === type) {
-            p.proto = specified;
-            p.root = specified.root || specified;
+        if (chain && existing && 3 === type) {
+            p.proto = existing;
+            p.root = existing.root;
         }
         return p;
     };
@@ -5416,13 +5421,16 @@ pen.define("cdf/lib/CCC/protovis", function() {
             do for (var properties = mark.$properties, i = properties.length; i--; ) {
                 var p = properties[i], name = p.name, pLeaf = seen[name];
                 if (pLeaf) {
-                    if (3 === pLeaf.type) {
-                        var pRoot = pLeaf.root;
-                        pLeaf.root = p;
-                        pRoot ? pRoot.proto || (pRoot.proto = p) : pLeaf.proto = p;
+                    var pRoot = root[name];
+                    if (3 === pRoot.type) {
+                        pRoot._proto = p;
+                        pRoot = root[name] = p.root;
+                        pRoot._proto = null;
                     }
                 } else {
                     seen[name] = p;
+                    root[name] = p.root;
+                    p.root._proto = null;
                     switch (name) {
                       case "data":
                         data = p;
@@ -5439,7 +5447,7 @@ pen.define("cdf/lib/CCC/protovis", function() {
                 }
             } while (mark = mark.proto);
         }
-        var data, seen = {}, required = [], types = [ [], [], [], [] ];
+        var data, seen = {}, root = {}, required = [], types = [ [], [], [], [] ];
         bind(this);
         bind(this.defaults);
         var types0 = types[0], types1 = types[1].reverse(), types2 = types[2];
@@ -5530,7 +5538,7 @@ pen.define("cdf/lib/CCC/protovis", function() {
         }, null, function(p) {
             return p.value;
         }, function(p) {
-            _protoProp = p.proto;
+            _protoProp = p.proto || p._proto;
             return p.value.apply(this, _stack);
         } ];
         _evalPropByType[1] = _evalPropByType[0];
@@ -6188,7 +6196,6 @@ pen.define("cdf/lib/CCC/protovis", function() {
         return "string" == typeof c ? document.getElementById(c) : c;
     });
     pv.Panel.prototype.type = "panel";
-    pv.Panel.prototype.isPointingBarrier = !1;
     pv.Panel.prototype._zOrderChildCount = 0;
     pv.Panel.prototype.defaults = new pv.Panel().extend(pv.Bar.prototype.defaults).fillStyle(null).overflow("visible");
     pv.Panel.prototype.anchor = function(name) {
@@ -7594,7 +7601,7 @@ pen.define("cdf/lib/CCC/protovis", function() {
                 }
                 switch (s.layout) {
                   case "grouped":
-                    this._calcGrouped(bands, L, bh, s);
+                    this._calcGrouped(bands, L, s);
                     break;
 
                   case "stacked":
@@ -7721,7 +7728,24 @@ pen.define("cdf/lib/CCC/protovis", function() {
         stack.shift();
         return bands;
     };
-    pv.Layout.Band.prototype._normalizeBands = function(bands, L, bh, scene) {
+    pv.Layout.Band.prototype._calcGrouped = function(bands, L, scene) {
+        for (var b = 0, B = bands.length; B > b; b++) {
+            for (var band = bands[b], items = band.items, w = band.w, horizRatio = band.horizRatio, wItems = 0, l = 0; L > l; l++) wItems += items[l].w;
+            1 === L ? horizRatio = 1 : horizRatio > 0 && 1 >= horizRatio || (horizRatio = 1);
+            if (null == w) w = band.w = wItems / horizRatio; else if ("expand" === scene.horizontalMode) {
+                var wItems2 = horizRatio * w;
+                if (wItems) for (var wScale = wItems2 / wItems, l = 0; L > l; l++) items[l].w *= wScale; else for (var wiavg = wItems2 / L, l = 0; L > l; l++) items[l].w = wiavg;
+                wItems = wItems2;
+            }
+            for (var wItemsWithMargin = wItems / horizRatio, ix = band.x - wItemsWithMargin / 2, margin = L > 1 ? (wItemsWithMargin - wItems) / (L - 1) : 0, l = 0; L > l; l++) {
+                var item = items[l];
+                item.x = ix;
+                ix += item.w + margin;
+                item.dir < 0 && (item.y -= item.h);
+            }
+        }
+    };
+    pv.Layout.Band.prototype._calcStacked = function(bands, L, bh, scene) {
         var items, B = bands.length;
         if ("expand" === scene.verticalMode) for (var b = 0; B > b; b++) {
             items = bands[b].items;
@@ -7742,27 +7766,7 @@ pen.define("cdf/lib/CCC/protovis", function() {
                 null != h && (items[l].h = hAvg);
             }
         }
-        return items;
-    };
-    pv.Layout.Band.prototype._calcGrouped = function(bands, L, bh, scene) {
-        for (var items = this._normalizeBands(bands, L, bh, scene), b = 0, B = bands.length; B > b; b++) {
-            for (var band = bands[b], items = band.items, w = band.w, horizRatio = band.horizRatio, wItems = 0, l = 0; L > l; l++) wItems += items[l].w;
-            1 === L ? horizRatio = 1 : horizRatio > 0 && 1 >= horizRatio || (horizRatio = 1);
-            if (null == w) w = band.w = wItems / horizRatio; else if ("expand" === scene.horizontalMode) {
-                var wItems2 = horizRatio * w;
-                if (wItems) for (var wScale = wItems2 / wItems, l = 0; L > l; l++) items[l].w *= wScale; else for (var wiavg = wItems2 / L, l = 0; L > l; l++) items[l].w = wiavg;
-                wItems = wItems2;
-            }
-            for (var wItemsWithMargin = wItems / horizRatio, ix = band.x - wItemsWithMargin / 2, margin = L > 1 ? (wItemsWithMargin - wItems) / (L - 1) : 0, l = 0; L > l; l++) {
-                var item = items[l];
-                item.x = ix;
-                ix += item.w + margin;
-                item.dir < 0 && (item.y -= item.h);
-            }
-        }
-    };
-    pv.Layout.Band.prototype._calcStacked = function(bands, L, bh, scene) {
-        for (var items = this._normalizeBands(bands, L, bh, scene), yZero = scene.yZero, yOffset = yZero, b = 0, B = bands.length; B > b; b++) {
+        for (var yZero = scene.yZero, yOffset = yZero, b = 0; B > b; b++) {
             var band = bands[b], bx = band.x, bDiffControl = band.diffControl, positiveGoesDown = 0 > bDiffControl, vertiMargin = Math.max(0, band.vertiMargin);
             items = band.items;
             var resultPos = this._layoutItemsOfDir(1, positiveGoesDown, items, vertiMargin, bx, yOffset), resultNeg = null;
@@ -9072,23 +9076,17 @@ pen.define("cdf/lib/CCC/protovis", function() {
             if (scene.visible) for (var i = scene.children.length - 1; i >= 0; i--) if (searchScenes(scene.children[i], curr)) return !0;
         }
         function searchScenes(scenes, curr) {
-            var result, j, isPointingBarrier, mark = scenes.mark, isPanel = "panel" === mark.type;
-            if (mark.$handlers.point) {
-                var visibility, mouse = (isPanel && mark.parent || mark).mouse(), markRMax = mark._pointingRadiusMax, markCostMax = markRMax * markRMax;
-                j = scenes.length;
-                for (;j--; ) if ((visibility = sceneVisibility(scenes, j)) && evalScene(scenes, j, mouse, curr, visibility, markCostMax)) {
-                    result = !0;
-                    break;
-                }
+            var result, mark = scenes.mark, isPanel = "panel" === mark.type;
+            if (mark.$handlers.point) for (var visibility, mouse = (isPanel && mark.parent || mark).mouse(), markRMax = mark._pointingRadiusMax, markCostMax = markRMax * markRMax, j = scenes.length - 1; j >= 0; j--) if ((visibility = sceneVisibility(scenes, j)) && evalScene(scenes, j, mouse, curr, visibility, markCostMax)) {
+                result = !0;
+                break;
             }
             if (isPanel) {
                 mark.scene = scenes;
-                isPointingBarrier = !(!mark.isPointingBarrier || !mark.parent);
                 try {
-                    j = scenes.length;
-                    for (;j--; ) {
+                    for (var j = scenes.length - 1; j >= 0; j--) {
                         mark.index = j;
-                        if ((!isPointingBarrier || mark.getShape(scenes, j).containsPoint(mark.parent.mouse())) && searchSceneChildren(scenes[j], curr)) return !0;
+                        if (searchSceneChildren(scenes[j], curr)) return !0;
                     }
                 } finally {
                     delete mark.scene;
@@ -9177,13 +9175,13 @@ pen.define("cdf/lib/CCC/protovis", function() {
                 unpoint = point;
                 if (point) {
                     pv.Mark.dispatch("point", point.scenes, point.index, e);
-                    if (pointingPanel || "panel" !== this.type) pv.listen(this.root.canvas(), "mouseout", mouseout); else {
+                    if (pointingPanel) ; else if ("panel" === this.type) {
                         pointingPanel = this;
-                        pointingPanel.event("mouseout", function() {
-                            mouseout.call(pointingPanel.scene.$g);
+                        this.event("mouseout", function() {
+                            mouseout.call(this.scene.$g);
                         });
                         stealClick && pointingPanel.addEventInterceptor("click", eventInterceptor);
-                    }
+                    } else pv.listen(this.root.canvas(), "mouseout", mouseout);
                 }
             } finally {
                 DEBUG && console.log("POINT MOUSE MOVE END");

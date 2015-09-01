@@ -737,6 +737,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
     pvc.parsePointingMode = pvc.makeEnumParser("pointingMode", [ "over", "near" ], "near");
     pvc.parsePointingCollapse = pvc.makeEnumParser("pointingCollapse", [ "none", "x", "y" ], "none");
     pvc.parseShape = pvc.makeEnumParser("shape", pv.Scene.hasSymbol, null);
+    pvc.parseDataTypeCheckingMode = pvc.makeEnumParser("typeCheckingMode", [ "none", "minimum", "extended" ], "minimum");
     pvc.parseContinuousColorScaleType = function(scaleType) {
         if (scaleType) {
             scaleType = ("" + scaleType).toLowerCase();
@@ -2228,7 +2229,12 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
         var defaultSourceRoleName = def.get(keyArgs, "defaultSourceRole");
         defaultSourceRoleName && (this.defaultSourceRoleName = this.plot ? this.plot.ensureAbsRoleRef(defaultSourceRoleName) : defaultSourceRoleName);
         var defaultDimensionName = def.get(keyArgs, "defaultDimension");
-        defaultDimensionName && (this.defaultDimensionName = defaultDimensionName);
+        if (defaultDimensionName) {
+            this.defaultDimensionName = defaultDimensionName;
+            var match = defaultDimensionName.match(/^(.*?)(\*)?$/);
+            this.defaultDimensionGroup = match[1];
+            this.defaultDimensionGreedy = !!match[2];
+        }
         var rootLabel = def.get(keyArgs, "rootLabel");
         null != rootLabel && (this.rootLabel = rootLabel);
         var traversalModes = def.get(keyArgs, "traversalModes");
@@ -2258,6 +2264,8 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
         isPercent: !1,
         defaultSourceRoleName: null,
         defaultDimensionName: null,
+        defaultDimensionGroup: null,
+        defaultDimensionGreedy: null,
         grouping: null,
         traversalMode: pvc.visual.TraversalMode.FlattenLeafs,
         traversalModes: pvc.visual.TraversalMode.AllMask,
@@ -2554,10 +2562,9 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
         }
         function autoPrebindUnbound(r) {
             if (r.sourceRole) return addUnboundSourced(r);
-            var dimName = r.defaultDimensionName;
-            if (dimName) {
-                var match = dimName.match(/^(.*?)(\*)?$/) || def.fail.argumentInvalid("defaultDimensionName"), defaultName = match[1], greedy = match[2];
-                if (greedy) {
+            var defaultName = r.defaultDimensionGroup;
+            if (defaultName) {
+                if (r.defaultDimensionGreedy) {
                     var groupDimNames = complexTypeProj.groupDimensionsNames(defaultName);
                     if (groupDimNames) return preBindToDims(r, groupDimNames);
                 } else if (complexTypeProj.hasDim(defaultName)) return preBindToDims(r, defaultName);
@@ -5830,6 +5837,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             processDataOption("dataCategoriesCount", "categoriesCount");
             processDataOption("dataIgnoreMetadataLabels", "ignoreMetadataLabels");
             processDataOption("dataWhere", "where");
+            processDataOption("dataTypeCheckingMode", "typeCheckingMode");
             var plot2Series, plot2SeriesIndexes, plot2 = options.plot2;
             if (plot2) {
                 if (this._allowV1SecondAxis && this.compatVersion() <= 1) plot2SeriesIndexes = options.secondAxisIdx; else {
@@ -6040,7 +6048,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
         },
         _getDataPartDimName: function(useDefault) {
             var preGrouping, role = this.visualRoles.dataPart;
-            return role.isBound() ? role.lastDimensionName() : (preGrouping = role.preBoundGrouping()) ? preGrouping.lastDimensionName() : useDefault ? role.defaultDimensionName : null;
+            return role.isBound() ? role.lastDimensionName() : (preGrouping = role.preBoundGrouping()) ? preGrouping.lastDimensionName() : useDefault ? role.defaultDimensionGroup : null;
         }
     });
     pvc.BaseChart.add({
@@ -6149,15 +6157,11 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             };
         },
         _createTranslation: function(complexTypeProj, dimsOptions, dataPartDimName) {
-            var translOptions = this._createTranslationOptions(dimsOptions, dataPartDimName), translation = this._createTranslationCore(complexTypeProj, translOptions);
+            var translOptions = this._createTranslationOptions(dimsOptions, dataPartDimName), TranslationClass = this._getTranslationClass(translOptions), translation = new TranslationClass(complexTypeProj, this.resultset, this.metadata, translOptions);
             def.debug >= 3 && (this.log(translation.logSource()), this.log(translation.logTranslatorType()));
             translation.configureType();
-            def.debug >= 3 && this.log(translation.logVItem());
+            def.debug >= 3 && this.log(translation.logLogicalRow());
             return translation;
-        },
-        _createTranslationCore: function(complexTypeProj, translOptions) {
-            var TranslationClass = this._getTranslationClass(translOptions);
-            return new TranslationClass(this, complexTypeProj, this.resultset, this.metadata, translOptions);
         },
         _getTranslationClass: function(translOptions) {
             return translOptions.crosstabMode ? cdo.CrosstabTranslationOper : cdo.RelationalTranslationOper;
@@ -6183,6 +6187,7 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 measuresIndexes: options.measuresIndexes,
                 multiChartIndexes: options.multiChartIndexes,
                 ignoreMetadataLabels: dataOptions.ignoreMetadataLabels,
+                typeCheckingMode: pvc.parseDataTypeCheckingMode(dataOptions.typeCheckingMode),
                 separator: dataOptions.separator,
                 measuresInColumns: dataOptions.measuresInColumns,
                 categoriesCount: dataOptions.categoriesCount,
@@ -12492,41 +12497,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
         }
     }));
     pvc.visual.Plot.registerClass(pvc.visual.MetricPointPlot);
-    def.type("pvc.data.MetricPointChartTranslationOper").add({
-        _meaLayoutRoles: [ "x", "y", "color", "size" ],
-        _configureTypeCore: function() {
-            var freeMeaIndexes = [], freeDisIndexes = [];
-            this._collectFreeDiscreteAndContinuousIndexes(freeDisIndexes, freeMeaIndexes);
-            var N, autoDimNames = [], F = freeMeaIndexes.length;
-            if (F > 0) {
-                for (var R = this._meaLayoutRoles.length, i = 0; R > i && autoDimNames.length < F; ) {
-                    this._getUnboundRoleDefaultDimNames(this._meaLayoutRoles[i], 1, autoDimNames);
-                    i++;
-                }
-                N = autoDimNames.length;
-                if (N > 0) {
-                    freeMeaIndexes.length = N;
-                    this.defReader({
-                        names: autoDimNames,
-                        indexes: freeMeaIndexes
-                    });
-                }
-            }
-            F = freeDisIndexes.length;
-            if (F > 0) {
-                autoDimNames.length = 0;
-                this._getUnboundRoleDefaultDimNames("series", F, autoDimNames);
-                N = autoDimNames.length;
-                if (N > 0) {
-                    freeDisIndexes.length = N;
-                    this.defReader({
-                        names: autoDimNames,
-                        indexes: freeDisIndexes
-                    });
-                }
-            }
-        }
-    });
     pvc.parseMetricPointSizeAxisRatioTo = pvc.makeEnumParser("ratioTo", [ "minWidthHeight", "height", "width" ], "minWidthHeight");
     def("pvc.visual.MetricPointSizeAxis", pvc.visual.SizeAxis.extend({
         options: {
@@ -12883,7 +12853,11 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             }));
         },
         _getTranslationClass: function(translOptions) {
-            return def.type(this.base(translOptions)).add(pvc.data.MetricPointChartTranslationOper);
+            return def.type(this.base(translOptions)).methods({
+                _configureTypeCore: function() {
+                    this._configureTypeByOrgLevel([ "series" ], [ "x", "y", "color", "size" ]);
+                }
+            });
         },
         _calcAxesOffsetPaddings: function() {
             var aops = this.base();
@@ -13310,28 +13284,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
         }
     }));
     pvc.visual.Plot.registerClass(pvc.visual.BoxPlot);
-    def.type("pvc.data.BoxplotChartTranslationOper").add({
-        _configureTypeCore: function() {
-            var visualRoles = this.chart.visualRoles, dimsReaders = [];
-            if (!visualRoles.series.isPreBound()) {
-                var S = this._getLogicalGroupLength("series");
-                S && this._collectDimReaders(dimsReaders, "series", null, S);
-            }
-            if (!visualRoles.category.isPreBound()) {
-                var C = this._getLogicalGroupLength("category");
-                C && this._collectDimReaders(dimsReaders, "category", null, C);
-            }
-            var M = this._getLogicalGroupLength("value");
-            if (M) {
-                var index = 0;
-                pvc.visual.BoxPlot.measureRolesNames.forEach(function(roleName) {
-                    var role = visualRoles[roleName];
-                    role.isPreBound() || (index = this._collectDimReaders(dimsReaders, "value", role.defaultDimensionName, 1, index, 1));
-                }, this);
-            }
-            dimsReaders.forEach(this.defReader, this);
-        }
-    });
     def.type("pvc.BoxplotPanel", pvc.CategoricalAbstractPanel).init(function(chart, parent, plot, options) {
         this.base(chart, parent, plot, options);
         this.boxSizeRatio = plot.option("BoxSizeRatio");
@@ -13583,7 +13535,15 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
     def.type("pvc.BoxplotChart", pvc.CategoricalAbstract).add({
         _defaultAxisBandSizeRatio: 1 / 3,
         _getTranslationClass: function(translOptions) {
-            return def.type(this.base(translOptions)).add(pvc.data.BoxplotChartTranslationOper);
+            return def.type(this.base(translOptions)).methods({
+                _configureTypeCore: function() {
+                    this._configureTypeByPhysicalGroup("series");
+                    this._configureTypeByPhysicalGroup("category");
+                    pvc.visual.BoxPlot.measureRolesNames.forEach(function(roleName) {
+                        this._configureTypeByPhysicalGroup("value", roleName, 1, 1);
+                    }, this);
+                }
+            });
         },
         _createPlotsInternal: function() {
             this._addPlot(new pvc.visual.BoxPlot(this));
@@ -13648,7 +13608,8 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 return {
                     defaultSourceRole: "category",
                     defaultDimension: "color*",
-                    rootLabel: this.option("RootCategoryLabel")
+                    rootLabel: this.option("RootCategoryLabel"),
+                    requireIsDiscrete: !0
                 };
             },
             createVisibleData: function(baseData, ka) {
@@ -13789,20 +13750,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 return itemData.parent ? isNotDegenerate(itemData) && hasChildren(itemData) : isLeaf(itemData) || children(itemData).any(isLeaf);
             } : function(itemData) {
                 return (!itemData.parent || isNotDegenerate(itemData)) && isLeaf(itemData);
-            });
-        }
-    });
-    def.type("pvc.data.TreemapChartTranslationOper").add({
-        _configureTypeCore: function() {
-            var autoDimNames = [], freeMeaIndexes = [], freeDisIndexes = [];
-            this._collectFreeDiscreteAndContinuousIndexes(freeDisIndexes, freeMeaIndexes);
-            var D = freeDisIndexes.length, M = freeMeaIndexes.length;
-            D && this._getUnboundRoleDefaultDimNames("category", D, autoDimNames);
-            M && def.query([ "size", "color" ]).take(M).each(function(roleName) {
-                this._getUnboundRoleDefaultDimNames(roleName, 1, autoDimNames);
-            }, this);
-            autoDimNames.length && this.defReader({
-                names: autoDimNames
             });
         }
     });
@@ -13957,7 +13904,11 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             color: !0
         },
         _getTranslationClass: function(translOptions) {
-            return def.type(this.base(translOptions)).add(pvc.data.TreemapChartTranslationOper);
+            return def.type(this.base(translOptions)).methods({
+                _configureTypeCore: function() {
+                    this._configureTypeByOrgLevel([ "category" ], [ "size" ]);
+                }
+            });
         },
         _getIsNullDatum: def.fun.constant(),
         _createPlotsInternal: function() {
@@ -14112,18 +14063,6 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             }
         }
     }));
-    def.type("pvc.data.SunburstChartTranslationOper").add({
-        _configureTypeCore: function() {
-            var autoDimNames = [], freeMeaIndexes = [], freeDisIndexes = [];
-            this._collectFreeDiscreteAndContinuousIndexes(freeDisIndexes, freeMeaIndexes);
-            var D = freeDisIndexes.length, M = freeMeaIndexes.length;
-            D && this._getUnboundRoleDefaultDimNames("category", D, autoDimNames);
-            M && this._getUnboundRoleDefaultDimNames("size", 1, autoDimNames);
-            autoDimNames.length && this.defReader({
-                names: autoDimNames
-            });
-        }
-    });
     def.type("pvc.SunburstPanel", pvc.PlotPanel).init(function(chart, parent, plot, options) {
         this.base(chart, parent, plot, options);
         this.axes.size = chart._getAxis("size", (plot.option("SizeAxis") || 0) - 1);
@@ -14279,7 +14218,11 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             color: !0
         },
         _getTranslationClass: function(translOptions) {
-            return def.type(this.base(translOptions)).add(pvc.data.SunburstChartTranslationOper);
+            return def.type(this.base(translOptions)).methods({
+                _configureTypeCore: function() {
+                    this._configureTypeByOrgLevel([ "category" ], [ "size" ]);
+                }
+            });
         },
         _getIsNullDatum: def.fun.constant(),
         _createPlotsInternal: function() {
@@ -14364,37 +14307,24 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
             options.selectable = !1;
             this.base(options);
         },
-        _createTranslationCore: function(complexTypeProj, translOptions) {
-            var translation = this.base(complexTypeProj, translOptions), size = translation.virtualItemSize();
-            if (size) switch (size) {
-              case 1:
-                translation.defReader({
-                    names: "value"
-                });
-                break;
-
-              case 2:
-                translation.defReader({
-                    names: [ "title", "value" ]
-                });
-                break;
-
-              case 3:
-                translation.defReader({
-                    names: [ "title", "value", "marker" ]
-                });
-                break;
-
-              default:
-                translation.defReader({
-                    names: [ "title", "subTitle", "value", "marker" ]
-                });
-                size > 4 && translation.defReader({
-                    names: "range",
-                    indexes: pv.range(4, size)
-                });
-            }
-            return translation;
+        _getTranslationClass: function(translOptions) {
+            return def.type(this.base(translOptions)).methods({
+                _configureTypeCore: function() {
+                    this._configureTypeByOrgLevel([ {
+                        name: "title",
+                        greedy: !1,
+                        maxCount: 1
+                    }, {
+                        name: "subTitle",
+                        greedy: !1,
+                        maxCount: 1
+                    } ], [ "value", "marker", {
+                        name: "range",
+                        greedy: !0,
+                        maxCount: 1/0
+                    } ]);
+                }
+            });
         },
         _createPlotsInternal: function() {
             this._addPlot(new pvc.visual.BulletPlot(this));
@@ -14412,7 +14342,8 @@ pen.define("cdf/lib/CCC/pvc-d1.0", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis", 
                 return this.chart.options.valueFormat(v);
             },
             crosstabMode: !1,
-            seriesInRows: !1
+            seriesInRows: !1,
+            dataTypeCheckingMode: "extended"
         }
     });
     def.type("pvc.BulletChartPanel", pvc.PlotPanel).add({

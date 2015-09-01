@@ -522,8 +522,8 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
     }
     function relTransl_dataPartGet(plot2DataSeriesIndexes, seriesReader) {
         function calcAxis2SeriesKeySet() {
-            var atoms = {}, seriesKeys = def.query(me.source).select(function(item) {
-                seriesReader(item, atoms);
+            var atoms = {}, seriesKeys = def.query(me.source).select(function(row) {
+                seriesReader(row, atoms);
                 var value = atoms.series;
                 null != value && null != value.v && (value = value.v);
                 return value || null;
@@ -2961,30 +2961,26 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             }
         }
     });
-    def.type("cdo.TranslationOper").init(function(chart, complexTypeProj, source, metadata, options) {
-        this.chart = chart;
-        this.complexTypeProj = complexTypeProj;
+    def.type("cdo.TranslationOper").init(function(complexTypeProj, source, metadata, options) {
+        this.complexTypeProj = complexTypeProj || def.fail.argumentRequired("complexTypeProj");
         this.source = source || def.fail.argumentRequired("source");
         this.metadata = metadata || def.fail.argumentRequired("metadata");
         this.options = options || {};
         this._initType();
         if (def.debug >= 4) {
-            this._logItems = !0;
-            this._logItemCount = 0;
+            this._logLogicalRows = !0;
+            this._logLogicalRowCount = 0;
         }
     }).add({
-        _logItems: !1,
+        _logLogicalRows: !1,
         logSource: def.abstractMethod,
-        logVItem: def.abstractMethod,
+        logLogicalRow: def.abstractMethod,
         _translType: "Unknown",
         logTranslatorType: function() {
             return this._translType + " data source translator";
         },
-        virtualItemSize: function() {
+        logicalColumnCount: function() {
             return this.metadata.length;
-        },
-        freeVirtualItemSize: function() {
-            return this.virtualItemSize() - this._userUsedIndexesCount;
         },
         setSource: function(source) {
             if (!source) throw def.error.argumentRequired("source");
@@ -3015,12 +3011,10 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         _initType: function() {
             this._userDimsReaders = [];
             this._userDimsReadersByDim = {};
-            this._userItem = [];
             this._userUsedIndexes = {};
-            this._userUsedIndexesCount = 0;
             this._userIndexesToSingleDim = [];
             var userDimReaders = this.options.readers;
-            userDimReaders && userDimReaders.forEach(this.defReader, this);
+            userDimReaders && def.array.each(userDimReaders, this.defReader, this);
             var multiChartIndexes = def.parseDistinctIndexArray(this.options.multiChartIndexes);
             multiChartIndexes && (this._multiChartIndexes = this.defReader({
                 names: "multiChart",
@@ -3030,10 +3024,8 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         _userUseIndex: function(index) {
             index = +index;
             if (0 > index) throw def.error.argumentInvalid("index", "Invalid reader index: '{0}'.", [ index ]);
-            if (def.hasOwn(this._userUsedIndexes, index)) throw def.error.argumentInvalid("index", "Virtual item index '{0}' is already assigned.", [ index ]);
+            if (def.hasOwn(this._userUsedIndexes, index)) throw def.error.argumentInvalid("index", "Column '{0}' of the logical table is already assigned.", [ index ]);
             this._userUsedIndexes[index] = !0;
-            this._userUsedIndexesCount++;
-            this._userItem[index] = !0;
             return index;
         },
         _userCreateReaders: function(dimNames, indexes) {
@@ -3044,7 +3036,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             if (N > I) {
                 var nextIndex = I > 0 ? indexes[I - 1] + 1 : 0;
                 do {
-                    nextIndex = this._nextAvailableItemIndex(nextIndex);
+                    nextIndex = this._getNextFreeLogicalColumnIndex(nextIndex);
                     indexes[I] = nextIndex;
                     this._userUseIndex(nextIndex);
                     I++;
@@ -3075,7 +3067,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         _readDim: function(name, reader) {
             var info, spec, index = this._userIndexesToSingleDim.indexOf(name);
             if (index >= 0) {
-                info = this._itemInfos[index];
+                info = this._logicalRowInfos[index];
                 if (info && !this.options.ignoreMetadataLabels) {
                     var label = info.label || info.name && def.titleFromName(info.name);
                     label && (spec = {
@@ -3092,28 +3084,28 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         },
         _executeCore: function() {
             var dimsReaders = this._getDimensionsReaders();
-            return def.query(this._getItems()).select(function(item) {
-                return this._readItem(item, dimsReaders);
+            return def.query(this._getLogicalRows()).select(function(row) {
+                return this._readLogicalRow(row, dimsReaders);
             }, this);
         },
-        _getItems: function() {
+        _getLogicalRows: function() {
             return this.source;
         },
         _getDimensionsReaders: function() {
-            return this._userDimsReaders;
+            return this._userDimsReaders.slice().reverse();
         },
-        _readItem: function(item, dimsReaders) {
-            for (var logItem = this._logItems && this._logItemBefore(item), r = 0, R = dimsReaders.length, data = this.data, atoms = {}; R > r; ) dimsReaders[r++].call(data, item, atoms);
-            logItem && this._logItemAfter(atoms);
+        _readLogicalRow: function(logicalRow, dimsReaders) {
+            for (var doLog = this._logLogicalRows && this._logLogicalRowBefore(logicalRow), r = dimsReaders.length, data = this.data, atoms = {}; r--; ) dimsReaders[r].call(data, logicalRow, atoms);
+            doLog && this._logLogicalRowAfter(atoms);
             return atoms;
         },
-        _logItemBefore: function(vitem) {
-            if (this._logItemCount < 10) return def.log("virtual item [" + this._logItemCount++ + "]: " + def.describe(vitem)), 
+        _logLogicalRowBefore: function(logicalRow) {
+            if (this._logLogicalRowCount < 10) return def.log("logical row [" + this._logLogicalRowCount++ + "]: " + def.describe(logicalRow)), 
             !0;
             def.log("...");
-            return this._logItems = !1;
+            return this._logLogicalRows = !1;
         },
-        _logItemAfter: function(readAtoms) {
+        _logLogicalRowAfter: function(readAtoms) {
             var logAtoms = {};
             for (var dimName in readAtoms) {
                 var atom = readAtoms[dimName];
@@ -3123,69 +3115,94 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             def.log("-> read: " + def.describe(logAtoms));
         },
         _propGet: function(dimName, prop) {
-            function propGet(item, atoms) {
-                atoms[dimName] = item[prop];
+            function propGet(logicalRow, atoms) {
+                atoms[dimName] = logicalRow[prop];
             }
             return propGet;
         },
-        _nextAvailableItemIndex: function(index, L) {
+        _getNextFreeLogicalColumnIndex: function(index, L) {
             null == index && (index = 0);
             null == L && (L = 1/0);
-            for (;L > index && def.hasOwn(this._userItem, index); ) index++;
+            for (;L > index && def.hasOwn(this._userUsedIndexes, index); ) index++;
             return L > index ? index : -1;
         },
-        _getLogicalGroupStartIndex: function(name) {
-            return def.getOwn(this._itemLogicalGroupIndex, name);
+        _getPhysicalGroupStartIndex: function(name) {
+            return def.getOwn(this._logicalRowPhysicalGroupIndex, name);
         },
-        _getLogicalGroupLength: function(name) {
-            return def.getOwn(this._itemLogicalGroupsLength, name);
+        _getPhysicalGroupLength: function(name) {
+            return def.getOwn(this._logicalRowPhysicalGroupsLength, name);
         },
-        _collectDimReaders: function(dimsReaders, logGroupName, dimGroupName, count, startIndex, levelCount) {
-            var gStartIndex = this._itemLogicalGroupIndex[logGroupName], gLength = this._itemLogicalGroupsLength[logGroupName], gEndIndex = gStartIndex + gLength - 1, index = Math.max(gStartIndex, startIndex || 0);
-            count = null == count ? gLength : Math.min(gLength, count);
-            if (count && gEndIndex >= index) {
-                dimGroupName || (dimGroupName = logGroupName);
-                levelCount || (levelCount = 1/0);
-                for (var dimName, level = 0; count && levelCount > level; ) {
+        _configureTypeByPhysicalGroup: function(physicalGroupName, dimGroupName, dimCount, levelMax) {
+            var gStartIndex = this._logicalRowPhysicalGroupIndex[physicalGroupName], gLength = this._logicalRowPhysicalGroupsLength[physicalGroupName], gEndIndex = gStartIndex + gLength - 1, index = gStartIndex;
+            dimCount = null == dimCount ? gLength : Math.min(gLength, dimCount);
+            if (dimCount && gEndIndex >= index) {
+                dimGroupName || (dimGroupName = physicalGroupName);
+                levelMax || (levelMax = 1/0);
+                for (var dimName, level = 0; dimCount && levelMax > level; ) {
                     dimName = def.indexedId(dimGroupName, level++);
                     if (!this.complexTypeProj.isReadOrCalc(dimName)) {
-                        index = this._nextAvailableItemIndex(index);
+                        index = this._getNextFreeLogicalColumnIndex(index);
                         if (index > gEndIndex) return index;
-                        dimsReaders.push({
+                        this.defReader({
                             names: dimName,
                             indexes: index
                         });
                         index++;
-                        count--;
+                        dimCount--;
                     }
                 }
             }
             return index;
         },
-        _getUnboundRoleDefaultDimNames: function(roleName, count, dims, level) {
-            var role = this.chart.visualRoles[roleName];
-            if (role && !role.isPreBound()) {
-                var dimGroupName = role.defaultDimensionName;
-                if (dimGroupName) {
-                    dimGroupName = dimGroupName.match(/^(.*?)(\*)?$/)[1];
-                    dims || (dims = []);
-                    null == level && (level = 0);
-                    null == count && (count = 1);
-                    for (;count--; ) {
-                        var dimName = def.indexedId(dimGroupName, level++);
-                        this.complexTypeProj.isReadOrCalc(dimName) || dims.push(dimName);
-                    }
-                    return dims.length ? dims : null;
-                }
-            }
-        },
-        _collectFreeDiscreteAndContinuousIndexes: function(freeDisIndexes, freeMeaIndexes) {
-            this._itemInfos.forEach(function(info, index) {
+        _configureTypeByOrgLevel: function(discreteDimGroups, continuousDimGroups) {
+            var freeContinuous = [], freeDiscrete = [];
+            this._logicalRowInfos.forEach(function(info, index) {
                 if (!this[index]) {
-                    var indexes = 1 === info.type ? freeMeaIndexes : freeDisIndexes;
+                    var indexes = 1 === info.type ? freeContinuous : freeDiscrete;
                     indexes && indexes.push(index);
                 }
             }, this._userUsedIndexes);
+            this._configureTypeByDimGroups(freeDiscrete, this._processDimGroupSpecs(discreteDimGroups, !0, 1/0));
+            this._configureTypeByDimGroups(freeContinuous, this._processDimGroupSpecs(continuousDimGroups, !1, 1));
+        },
+        _processDimGroupSpecs: function(dimGroupSpecs, defaultGreedy, defaultMaxCount) {
+            return dimGroupSpecs.map(function(dimGroupSpec) {
+                return def.string.is(dimGroupSpec) ? {
+                    name: dimGroupSpec,
+                    greedy: defaultGreedy,
+                    maxCount: defaultMaxCount
+                } : def.setDefaults(dimGroupSpec, {
+                    greedy: defaultGreedy,
+                    maxCount: defaultMaxCount
+                });
+            });
+        },
+        _configureTypeByDimGroups: function(freeIndexes, dimGroups) {
+            if (dimGroups) for (var F, g = -1, G = dimGroups.length; ++g < G && (F = freeIndexes.length); ) {
+                var dimGroupSpec = dimGroups[g], maxCount = Math.min(dimGroupSpec.maxCount, F), defaultDims = this._getFreeDimGroupNames(dimGroupSpec.name, maxCount, dimGroupSpec.greedy);
+                if (defaultDims) {
+                    {
+                        defaultDims.length;
+                    }
+                    this.defReader({
+                        names: defaultDims,
+                        indexes: freeIndexes.splice(0, defaultDims.length)
+                    });
+                }
+            }
+        },
+        _getFreeDimGroupNames: function(dimGroupName, dimCount, greedy) {
+            if (!dimGroupName) return null;
+            var dims = [], level = 0;
+            null == dimCount && (dimCount = 1);
+            for (;dimCount; ) {
+                var dimName = def.indexedId(dimGroupName, level++);
+                if (this.complexTypeProj.isReadOrCalc(dimName)) greedy || dimCount--; else {
+                    dims.push(dimName);
+                    dimCount--;
+                }
+            }
+            return dims.length ? dims : null;
         }
     });
     def.type("cdo.MatrixTranslationOper", cdo.TranslationOper).add({
@@ -3205,25 +3222,34 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             integer: 1
         },
         _processMetadata: function() {
-            for (var knownContinColTypes = this._knownContinuousColTypes, columns = def.query(this.metadata).select(function(colDef, colIndex) {
+            var columnTypes, typeCheckingMode = this.options.typeCheckingMode, knownContinColTypes = this._knownContinuousColTypes;
+            if ("none" === typeCheckingMode) columnTypes = def.query(this.metadata).select(function(colDef, colIndex) {
                 colDef.colIndex = colIndex;
-                return colDef;
-            }).where(function(colDef) {
                 var colType = colDef.colType;
-                return !colType || 1 !== knownContinColTypes[colType.toLowerCase()];
-            }).select(function(colDef) {
-                return colDef.colIndex;
-            }).array(), columnTypes = def.array.create(this.J, 1), I = this.I, source = this.source, J = columns.length, i = 0; I > i && J > 0; i++) for (var row = source[i], m = 0; J > m; ) {
-                var j = columns[m], value = row[j];
-                if (null != value) {
-                    columnTypes[j] = this._getSourceValueType(value);
-                    columns.splice(m, 1);
-                    J--;
-                } else m++;
+                return colType && 1 === knownContinColTypes[colType.toLowerCase()] ? 1 : 0;
+            }).array(); else {
+                var checkNumericString = "extended" === typeCheckingMode, columns = def.query(this.metadata).select(function(colDef, colIndex) {
+                    colDef.colIndex = colIndex;
+                    return colDef;
+                }).where(function(colDef) {
+                    var colType = colDef.colType;
+                    return !colType || 1 !== knownContinColTypes[colType.toLowerCase()];
+                }).select(function(colDef) {
+                    return colDef.colIndex;
+                }).array(), I = this.I, source = this.source, J = columns.length;
+                columnTypes = def.array.create(this.J, 1);
+                for (var i = 0; I > i && J > 0; i++) for (var row = source[i], m = 0; J > m; ) {
+                    var j = columns[m], value = row[j];
+                    if (null != value) {
+                        columnTypes[j] = this._getSourceValueType(value, checkNumericString);
+                        columns.splice(m, 1);
+                        J--;
+                    } else m++;
+                }
             }
             this._columnTypes = columnTypes;
         },
-        _buildItemInfoFromMetadata: function(index) {
+        _buildLogicalColumnInfoFromMetadata: function(index) {
             var meta = this.metadata[index];
             return {
                 type: this._columnTypes[index],
@@ -3231,13 +3257,16 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                 label: meta.colLabel
             };
         },
-        _getSourceValueType: function(value) {
+        _getSourceValueType: function(value, checkNumericString) {
             switch (typeof value) {
               case "number":
                 return 1;
 
+              case "string":
+                return checkNumericString && "" !== value && !isNaN(+value) ? 1 : 0;
+
               case "object":
-                if (value instanceof Date) return 1;
+                return value instanceof Date ? 1 : 0;
             }
             return 0;
         },
@@ -3266,17 +3295,17 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             table.rowSep().row("(" + Math.min(R, this.I) + "/" + this.I + ")").rowSep(!0);
             return "DATA SOURCE SUMMARY\n" + table() + "\n";
         },
-        _logVItem: function(kindList, kindScope) {
+        _logLogicalRow: function(kindList, kindScope) {
             var table = def.textTable(6).rowSep().row("Index", "Kind", "Type", "Name", "Label", "Dimension").rowSep(), index = 0;
             kindList.forEach(function(kind) {
                 for (var i = 0, L = kindScope[kind]; L > i; i++) {
-                    var info = this._itemInfos[index];
+                    var info = this._logicalRowInfos[index];
                     table.row(index, kind, info.type ? "number" : "string", info.name || "", info.label || "", this._userIndexesToSingleDim[index] || "");
                     index++;
                 }
             }, this);
             table.rowSep(!0);
-            return "VIRTUAL ITEM ARRAY\n" + table() + "\n";
+            return "LOGICAL TABLE\n" + table() + "\n";
         },
         _createPlot2SeriesKeySet: function(plot2DataSeriesIndexes, seriesKeys) {
             var plot2SeriesKeySet = null, seriesCount = seriesKeys.length;
@@ -3311,46 +3340,44 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             });
         },
         _configureTypeCore: function() {
-            var index = 0, dimsReaders = [];
-            [ "series", "category", "value" ].forEach(function(logGroupName) {
-                index = this._collectDimReaders(dimsReaders, logGroupName, null, 1/0, index);
+            [ "series", "category", "value" ].forEach(function(physicalGroupName) {
+                this._configureTypeByPhysicalGroup(physicalGroupName);
             }, this);
-            dimsReaders.forEach(this.defReader, this);
         }
     });
     cdo.previewRowsMax = 15;
     cdo.previewColsMax = 6;
     def.type("cdo.CrosstabTranslationOper", cdo.MatrixTranslationOper).add({
         _translType: "Crosstab",
-        virtualItemSize: function() {
+        logicalColumnCount: function() {
             return this.R + this.C + this.M;
         },
         _executeCore: function() {
-            function updateVItemCrossGroup(crossGroupId, source) {
-                for (var itemIndex = itemCrossGroupIndex[crossGroupId], sourceIndex = 0, depth = me[crossGroupId]; depth-- > 0; ) item[itemIndex++] = source[sourceIndex++];
+            function updateLogicalRowCrossGroup(crossGroupId, source) {
+                for (var logColIndex = logicalRowCrossGroupIndex[crossGroupId], sourceIndex = 0, depth = me[crossGroupId]; depth-- > 0; ) logRow[logColIndex++] = source[sourceIndex++];
             }
-            function updateVItemMeasure(line, cg) {
-                for (var itemIndex = itemCrossGroupIndex.M, cgIndexes = me._colGroupsIndexes[cg], depth = me.M, i = 0; depth > i; i++) {
+            function updateLogicalRowMeasure(line, cg) {
+                for (var logColIndex = logicalRowCrossGroupIndex.M, cgIndexes = me._colGroupsIndexes[cg], depth = me.M, i = 0; depth > i; i++) {
                     var lineIndex = cgIndexes[i];
-                    item[itemIndex++] = null != lineIndex ? line[lineIndex] : null;
+                    logRow[logColIndex++] = null != lineIndex ? line[lineIndex] : null;
                 }
             }
             if (!this.metadata.length) return def.query();
-            var dimsReaders = this._getDimensionsReaders(), item = new Array(this.virtualItemSize()), itemCrossGroupIndex = this._itemCrossGroupIndex, me = this, q = def.query(this.source);
+            var dimsReaders = this._getDimensionsReaders(), logRow = new Array(this.logicalColumnCount()), logicalRowCrossGroupIndex = this._logicalRowCrossGroupIndex, me = this, q = def.query(this.source);
             if (this._colGroups && this._colGroups.length) {
                 var expandLine = function(line) {
-                    updateVItemCrossGroup("R", line);
+                    updateLogicalRowCrossGroup("R", line);
                     return def.query(this._colGroups).select(function(colGroup, cg) {
-                        updateVItemCrossGroup("C", colGroup);
-                        updateVItemMeasure(line, cg);
-                        return this._readItem(item, dimsReaders);
+                        updateLogicalRowCrossGroup("C", colGroup);
+                        updateLogicalRowMeasure(line, cg);
+                        return this._readLogicalRow(logRow, dimsReaders);
                     }, this);
                 };
                 return q.selectMany(expandLine, this);
             }
             return q.select(function(line) {
-                updateVItemCrossGroup("R", line);
-                return this._readItem(item, dimsReaders);
+                updateLogicalRowCrossGroup("R", line);
+                return this._readLogicalRow(logRow, dimsReaders);
             }, this);
         },
         _processMetadata: function() {
@@ -3374,7 +3401,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     };
                 };
                 return metadata.map(f);
-            }(), itemCrossGroupInfos = this._itemCrossGroupInfos = {};
+            }(), logicalRowCrossGroupInfos = this._logicalRowCrossGroupInfos = {};
             if (this.options.isMultiValued) {
                 var measuresInColumns = def.get(this.options, "measuresInColumns", !0);
                 if (measuresInColumns || null == this.options.measuresIndex) {
@@ -3391,18 +3418,18 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                                 this._colGroups[cg] = this._splitEncodedColGroupCell(colGroup);
                                 this._colGroupsIndexes[cg] = [ this.R + cg ];
                             }, this);
-                            itemCrossGroupInfos.M = [ this._buildItemInfoFromMetadata(R) ];
+                            logicalRowCrossGroupInfos.M = [ this._buildLogicalColumnInfoFromMetadata(R) ];
                         }
                         this.C = this._colGroups[0].length;
-                        itemCrossGroupInfos.C = def.range(0, this.C).select(function() {
+                        logicalRowCrossGroupInfos.C = def.range(0, this.C).select(function() {
                             return {
                                 type: 0
                             };
                         }).array();
                     } else {
                         this.C = this.M = 0;
-                        itemCrossGroupInfos.M = [];
-                        itemCrossGroupInfos.C = [];
+                        logicalRowCrossGroupInfos.M = [];
+                        logicalRowCrossGroupInfos.C = [];
                     }
                 } else {
                     this.measuresDirection = "rows";
@@ -3423,37 +3450,37 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     this._colGroups[cg] = [ colGroup ];
                     this._colGroupsIndexes[cg] = [ R + cg ];
                 }, this);
-                itemCrossGroupInfos.C = [ {
+                logicalRowCrossGroupInfos.C = [ {
                     type: 0
                 } ];
-                itemCrossGroupInfos.M = [ {
+                logicalRowCrossGroupInfos.M = [ {
                     type: this._columnTypes[R]
                 } ];
             }
-            itemCrossGroupInfos.R = def.range(0, this.R).select(this._buildItemInfoFromMetadata, this).array();
-            var itemGroupIndex = this._itemCrossGroupIndex = {
+            logicalRowCrossGroupInfos.R = def.range(0, this.R).select(this._buildLogicalColumnInfoFromMetadata, this).array();
+            var logicalRowCrossGroupIndex = this._logicalRowCrossGroupIndex = {
                 C: seriesInRows ? this.R : 0,
                 R: seriesInRows ? 0 : this.C,
                 M: this.C + this.R
-            }, itemInfos = this._itemInfos = new Array(this.virtualItemSize());
-            def.eachOwn(itemGroupIndex, function(groupStartIndex, crossGroup) {
-                itemCrossGroupInfos[crossGroup].forEach(function(info, groupIndex) {
-                    itemInfos[groupStartIndex + groupIndex] = info;
+            }, logicalRowInfos = this._logicalRowInfos = new Array(this.logicalColumnCount());
+            def.eachOwn(logicalRowCrossGroupIndex, function(groupStartIndex, crossGroup) {
+                logicalRowCrossGroupInfos[crossGroup].forEach(function(info, groupIndex) {
+                    logicalRowInfos[groupStartIndex + groupIndex] = info;
                 });
             });
-            this._itemLogicalGroupsLength = {
+            this._logicalRowPhysicalGroupsLength = {
                 series: seriesInRows ? this.R : this.C,
                 category: seriesInRows ? this.C : this.R,
                 value: this.M
             };
-            this._itemLogicalGroupIndex = {
+            this._logicalRowPhysicalGroupIndex = {
                 series: 0,
-                category: this._itemLogicalGroupsLength.series,
+                category: this._logicalRowPhysicalGroupsLength.series,
                 value: this.C + this.R
             };
         },
-        logVItem: function() {
-            return this._logVItem([ "C", "R", "M" ], {
+        logLogicalRow: function() {
+            return this._logLogicalRow([ "C", "R", "M" ], {
                 C: this.C,
                 R: this.R,
                 M: this.M
@@ -3546,7 +3573,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             });
             this._colGroups = colGroupsValues;
             this._colGroupsIndexes = colGroupsIndexes;
-            this._itemCrossGroupInfos.M = measuresInfoList;
+            this._logicalRowCrossGroupInfos.M = measuresInfoList;
             this.M = M;
         },
         configureType: function() {
@@ -3644,26 +3671,26 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             this.M = M;
             this.S = S;
             this.C = C;
-            var itemPerm = [];
+            var logicalRowPerm = [];
             [ "S", "C", "M" ].forEach(function(name) {
                 var groupSpec = specsByName[name];
-                groupSpec && def.array.append(itemPerm, groupSpec.indexes);
+                groupSpec && def.array.append(logicalRowPerm, groupSpec.indexes);
             });
-            this._itemInfos = itemPerm.map(this._buildItemInfoFromMetadata, this);
-            this._itemPerm = itemPerm;
-            this._itemLogicalGroupsLength = {
+            this._logicalRowInfos = logicalRowPerm.map(this._buildLogicalColumnInfoFromMetadata, this);
+            this._logicalRowPerm = logicalRowPerm;
+            this._logicalRowPhysicalGroupsLength = {
                 series: this.S,
                 category: this.C,
                 value: this.M
             };
-            this._itemLogicalGroupIndex = {
+            this._logicalRowPhysicalGroupIndex = {
                 series: 0,
-                category: this._itemLogicalGroupsLength.series,
+                category: this._logicalRowPhysicalGroupsLength.series,
                 value: this.S + this.C
             };
         },
-        logVItem: function() {
-            return this._logVItem([ "S", "C", "M" ], {
+        logLogicalRow: function() {
+            return this._logLogicalRow([ "S", "C", "M" ], {
                 S: this.S,
                 C: this.C,
                 M: this.M
@@ -3681,10 +3708,10 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             }
         },
         _executeCore: function() {
-            var dimsReaders = this._getDimensionsReaders(), permIndexes = this._itemPerm;
-            return def.query(this._getItems()).select(function(item) {
-                item = pv.permute(item, permIndexes);
-                return this._readItem(item, dimsReaders);
+            var dimsReaders = this._getDimensionsReaders(), permIndexes = this._logicalRowPerm;
+            return def.query(this._getLogicalRows()).select(function(row) {
+                row = pv.permute(row, permIndexes);
+                return this._readLogicalRow(row, dimsReaders);
             }, this);
         }
     });

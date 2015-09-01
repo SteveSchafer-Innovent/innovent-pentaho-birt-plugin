@@ -934,7 +934,7 @@ var SchedulePrptComponent = PrptComponent.extend({
                 },
                 error: function(response) {
                     alert(response.responseText);
-                    success = false;
+                    sucess = false;
                 }
             });
             $.ajaxSetup({

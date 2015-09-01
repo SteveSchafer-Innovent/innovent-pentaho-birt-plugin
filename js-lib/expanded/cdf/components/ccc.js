@@ -11,7 +11,7 @@
 * the license for the specific language governing your rights and limitations.
 */
 
-require(["cdf/lib/CCC/protovis", "cdf/lib/CCC/cdo", "cdf/lib/CCC/pvc-d1.0", "cdf/lib/CCC/def", "cdf/components/core"], function(_pv, _cdo, _pvc, _def) {
+require(["cdf/lib/CCC/protovis","cdf/lib/CCC/cdo","cdf/lib/CCC/pvc-d1.0","cdf/lib/CCC/def","cdf/components/core"],function(_pv,_cdo,_pvc,_def) {
     pvc = _pvc; pv  = _pv; def = _def; cdo = _cdo;
 
      ChartComponent =  UnmanagedComponent.extend({
