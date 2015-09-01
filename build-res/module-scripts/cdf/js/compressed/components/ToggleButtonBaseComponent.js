@@ -1,0 +1,8 @@
+define(["../lib/jquery","./InputBaseComponent"],function(a,e){var r=e.extend({draw:function(e){var r=this,t=r.dashboard.getParameterValue(r.parameter);
+t="function"==typeof t?t():t;var n=!1,o=[];t instanceof Array||"object"==typeof t&&t.join?o=t:"string"==typeof t&&(o=t.split("|"));
+var l=0==r.valueAsId?0:1,p=!1;a:for(var c=0;c<o.length;c++)for(var d=0;d<e.length;d++)if(o[c]==e[d][l]){p=!0;
+break a}!p&&r.defaultIfEmpty&&(o=[e[0][l]],r.currentVal=o,r.dashboard.setParameter(r.parameter,o),r.dashboard.processChange(r.name));
+for(var i=r.verticalOrientation?"toggleGroup vertical":"toggleGroup horizontal",s=a("<ul/>").attr({"class":i}),c=0,u=e.length;u>c;c++){var f=a("<li/>").attr({"class":i}),h=a("<input/>").click(function(){r.callAjaxAfterRender(r,r.name)
+});n=!1;for(var m=0,v=o.length;v>m&&!(n=o[m]==e[c][l]);m++);"radio"==r.type||"radioComponent"==r.type?((0==c&&!p||p&&e[c][l]==t)&&h.prop("checked",!0),h.attr({type:"radio"})):((0==c&&!p&&r.defaultIfEmpty||p&&n)&&h.prop("checked",!0),h.attr({type:"checkbox"})),h.attr({"class":r.name,name:r.name,id:r.name+c,value:e[c][l]}),h.appendTo(f),f.append(a("<label/>").attr({"for":r.name+c}).text(e[c][1])),s.append(f).append(void 0==r.separator||null==r.separator||"null"==r.separator?"":r.separator)
+}r.placeholder().html(s),r.currentVal=null,r._doAutoFocus()},callAjaxAfterRender:function(a,e){var r=a;
+setTimeout(function(){r.dashboard.processChange(e)},1)}});return r});

@@ -399,10 +399,6 @@ pen.define("cdf/lib/CCC/def", function() {
         }
         to[p] = def.fun.wraps(exportedTypeMethod, m);
     }
-    function fields_createChild(config) {
-        var factory = def.classOf(this);
-        return factory(config, this);
-    }
     function def_makeSetter(name, spec) {
         function setter(fields, v2) {
             if (void 0 !== v2) {
@@ -1567,7 +1563,6 @@ pen.define("cdf/lib/CCC/def", function() {
         instance: function(inst, config, proto, specs, privProp) {
             var fields = def.fields(inst, proto, privProp);
             specs && def.instanceAccessors(inst, fields, specs);
-            inst.createChild = fields_createChild;
             config && def.configure(inst, config);
             return fields;
         },

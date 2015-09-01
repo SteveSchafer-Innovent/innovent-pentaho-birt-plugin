@@ -522,8 +522,8 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
     }
     function relTransl_dataPartGet(plot2DataSeriesIndexes, seriesReader) {
         function calcAxis2SeriesKeySet() {
-            var atoms = {}, seriesKeys = def.query(me.source).select(function(row) {
-                seriesReader(row, atoms);
+            var atoms = {}, seriesKeys = def.query(me.source).select(function(item) {
+                seriesReader(item, atoms);
                 var value = atoms.series;
                 null != value && null != value.v && (value = value.v);
                 return value || null;
@@ -592,7 +592,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                 textFrag += t;
             }, endTextFrag = function() {
                 if (textFrag) {
-                    tryParseAbbrCurr();
                     addToken0({
                         type: 0,
                         text: textFrag
@@ -624,7 +623,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     scale: 0,
                     groupOn: 0,
                     scientific: 0,
-                    abbreviationOn: 0,
                     integer: {
                         list: [],
                         digits: 0
@@ -635,34 +633,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     }
                 };
                 part = section.integer;
-            }, tryParseAbbrCurr = function() {
-                if ("A" === textFrag) {
-                    textFrag = "";
-                    addToken({
-                        type: 6
-                    });
-                } else if ("C" === textFrag) {
-                    textFrag = "";
-                    addToken({
-                        type: 4
-                    });
-                } else if ("AC" === textFrag) {
-                    textFrag = "";
-                    addToken({
-                        type: 6
-                    });
-                    addToken({
-                        type: 4
-                    });
-                } else if ("CA" === textFrag) {
-                    textFrag = "";
-                    addToken({
-                        type: 4
-                    });
-                    addToken({
-                        type: 6
-                    });
-                }
             }, tryParseExponent = function() {
                 var c2, k = i + 1, positive = !1, digits = 0;
                 if (L > k) {
@@ -711,17 +681,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     }
                 } else if ("¤" === c) addToken({
                     type: 4
-                }); else if ("C" === c && "Currency" === mask.substring(i, i + 8)) {
-                    addToken({
-                        type: 4
-                    });
-                    i += 7;
-                } else if ("A" === c && "Abbreviation" === mask.substring(i, i + 12)) {
-                    addToken({
-                        type: 6
-                    });
-                    i += 11;
-                } else if (";" === c) {
+                }); else if (";" === c) {
                     endSection();
                     if (i + 1 >= L || ";" === mask.charAt(i + 1)) {
                         i++;
@@ -738,9 +698,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     0 > j && (j = L);
                     addTextFrag(mask.substring(i, j));
                     i = j;
-                } else if (" " === c) addToken({
-                    type: 7
-                }); else if ("e" !== c && "E" !== c || !tryParseExponent()) {
+                } else if ("e" !== c && "E" !== c || !tryParseExponent()) {
                     "%" === c ? section.scale += 2 : "‰" === c ? section.scale += 3 : "‱" === c && (section.scale += 4);
                     addTextFrag(c);
                 } else ;
@@ -787,15 +745,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
 
           case 5:
             addStep(numForm_buildExponent(section, token));
-            break;
-
-          case 6:
-            section.abbreviationOn = 1;
-            addStep(numForm_abbreviationSymbol);
-            break;
-
-          case 7:
-            addStep(numForm_buildLiteral(" "));
         }
         !beforeDecimal && part.digits && steps.unshift(numForm_buildReadDecimalSymbol(hasZero));
     }
@@ -820,15 +769,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
     }
     function numForm_buildFormatSectionPosNeg(section) {
         function numFormRt_formatSectionPosNeg(style, value, zeroFormat, negativeMode) {
-            var sdigits, abbreviation, value0 = value, exponent = 0, scale = section.scale;
-            if (section.abbreviationOn) for (var L = style.abbreviations.length, i = L; i > 0; i--) {
-                var y = 3 * i;
-                if (Math.pow(10, y) <= value) {
-                    scale -= y;
-                    abbreviation = i - 1;
-                    break;
-                }
-            }
+            var sdigits, value0 = value, exponent = 0, scale = section.scale;
             if (section.scientific) {
                 sdigits = Math.floor(Math.log(value) / Math.LN10);
                 exponent = scale + sdigits - section.integer.digits + 1;
@@ -836,11 +777,11 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             }
             scale && (value = def.mult10(value, scale));
             value = def.round10(value, section.fractional.digits);
-            return !value && zeroFormat ? zeroFormat(style, value0) : numFormRt_formatSection(section, style, value, negativeMode, exponent, abbreviation);
+            return !value && zeroFormat ? zeroFormat(style, value0) : numFormRt_formatSection(section, style, value, negativeMode, exponent);
         }
         return numFormRt_formatSectionPosNeg;
     }
-    function numFormRt_formatSection(section, style, value, negativeMode, exponent, abbreviation) {
+    function numFormRt_formatSection(section, style, value, negativeMode, exponent) {
         var svalue = "" + value, idot = svalue.indexOf("."), itext = 0 > idot ? svalue : svalue.substr(0, idot), ftext = 0 > idot ? "" : svalue.substr(idot + 1);
         "0" === itext && (itext = "");
         exponent || (exponent = 0);
@@ -850,10 +791,10 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         ftext = ftext.split("");
         style.group && section.groupOn && numFormRt_addGroupSeparators(style, itext);
         section.integer.list.forEach(function(f) {
-            out.push(f(style, itext, exponent, abbreviation));
+            out.push(f(style, itext, exponent));
         });
         section.fractional.list.forEach(function(f) {
-            out.push(f(style, ftext, exponent, abbreviation));
+            out.push(f(style, ftext, exponent));
         });
         return out.join("");
     }
@@ -911,9 +852,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
     function numFormRt_currencySymbol(style) {
         return style.currency;
     }
-    function numForm_abbreviationSymbol(style, text, exponent, abbreviation) {
-        return null != abbreviation ? style.abbreviations[abbreviation] : void 0;
-    }
     function dateForm_tryConfigure(other) {
         return def.string.is(other) ? !!this.mask(other) : def.is(other, dateForm) ? !!this.mask(other.mask()) : void 0;
     }
@@ -953,44 +891,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
           case customForm:
             return !!this.any(other);
         }
-        if (def.string.is(other)) {
-            var formP = langProvider(other);
-            if (formP) return !!def.configure(this, formP);
-        }
-    }
-    function configLanguage(lang, config) {
-        lang = normalizeLanguageCode(lang);
-        var langStyle = def.getOwn(_languages, lang);
-        if (langStyle) def.configure(langStyle, config); else {
-            langStyle = _languages[lang] = formProvider(config);
-            langStyle.languageCode = lang;
-        }
-        return langStyle;
-    }
-    function parseLanguageCode(langCode) {
-        var re = /^([a-z]{2,8})(?:[-_]([a-z]{2}|\d{3}))?$/i, m = re.exec(langCode);
-        if (!m) return null;
-        var primary = m[1] ? m[1].toLowerCase() : "", region = m[2] ? m[2].toLowerCase() : "";
-        return {
-            code: primary + (region ? "-" + region : ""),
-            primary: primary,
-            region: region
-        };
-    }
-    function normalizeLanguageCode(langCode) {
-        return langCode ? langCode.toLowerCase() : "";
-    }
-    function getLanguage(langCode, fallback) {
-        langCode = normalizeLanguageCode(langCode);
-        var lang = def.getOwn(_languages, langCode);
-        if (lang) return lang;
-        if (!fallback) return null;
-        var norm = parseLanguageCode(langCode);
-        if (norm) {
-            if (norm.code !== langCode && (lang = def.getOwn(_languages, norm.code))) return lang;
-            if (norm.region && (lang = def.getOwn(_languages, norm.primary))) return lang;
-        }
-        return def.getOwn(_languages, _defaultLangCode, null);
     }
     var cdo = def.globalSpace("cdo", {});
     def.type("cdo.DimensionType").init(function(complexType, name, keyArgs) {
@@ -1989,7 +1889,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                 v = me._dimensionsList;
                 for (var i = 0, L = v.length; L > i; i++) v[i].dispose();
                 me._dimensions = null;
-                me._dimensionsList = null;
+                me._dimensionsLIst = null;
                 if (v = me.parent) {
                     v.removeChild(me);
                     me.parent = null;
@@ -2961,26 +2861,30 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             }
         }
     });
-    def.type("cdo.TranslationOper").init(function(complexTypeProj, source, metadata, options) {
-        this.complexTypeProj = complexTypeProj || def.fail.argumentRequired("complexTypeProj");
+    def.type("cdo.TranslationOper").init(function(chart, complexTypeProj, source, metadata, options) {
+        this.chart = chart;
+        this.complexTypeProj = complexTypeProj;
         this.source = source || def.fail.argumentRequired("source");
         this.metadata = metadata || def.fail.argumentRequired("metadata");
         this.options = options || {};
         this._initType();
         if (def.debug >= 4) {
-            this._logLogicalRows = !0;
-            this._logLogicalRowCount = 0;
+            this._logItems = !0;
+            this._logItemCount = 0;
         }
     }).add({
-        _logLogicalRows: !1,
+        _logItems: !1,
         logSource: def.abstractMethod,
-        logLogicalRow: def.abstractMethod,
+        logVItem: def.abstractMethod,
         _translType: "Unknown",
         logTranslatorType: function() {
             return this._translType + " data source translator";
         },
-        logicalColumnCount: function() {
+        virtualItemSize: function() {
             return this.metadata.length;
+        },
+        freeVirtualItemSize: function() {
+            return this.virtualItemSize() - this._userUsedIndexesCount;
         },
         setSource: function(source) {
             if (!source) throw def.error.argumentRequired("source");
@@ -3011,10 +2915,12 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         _initType: function() {
             this._userDimsReaders = [];
             this._userDimsReadersByDim = {};
+            this._userItem = [];
             this._userUsedIndexes = {};
+            this._userUsedIndexesCount = 0;
             this._userIndexesToSingleDim = [];
             var userDimReaders = this.options.readers;
-            userDimReaders && def.array.each(userDimReaders, this.defReader, this);
+            userDimReaders && userDimReaders.forEach(this.defReader, this);
             var multiChartIndexes = def.parseDistinctIndexArray(this.options.multiChartIndexes);
             multiChartIndexes && (this._multiChartIndexes = this.defReader({
                 names: "multiChart",
@@ -3024,8 +2930,10 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         _userUseIndex: function(index) {
             index = +index;
             if (0 > index) throw def.error.argumentInvalid("index", "Invalid reader index: '{0}'.", [ index ]);
-            if (def.hasOwn(this._userUsedIndexes, index)) throw def.error.argumentInvalid("index", "Column '{0}' of the logical table is already assigned.", [ index ]);
+            if (def.hasOwn(this._userUsedIndexes, index)) throw def.error.argumentInvalid("index", "Virtual item index '{0}' is already assigned.", [ index ]);
             this._userUsedIndexes[index] = !0;
+            this._userUsedIndexesCount++;
+            this._userItem[index] = !0;
             return index;
         },
         _userCreateReaders: function(dimNames, indexes) {
@@ -3036,7 +2944,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             if (N > I) {
                 var nextIndex = I > 0 ? indexes[I - 1] + 1 : 0;
                 do {
-                    nextIndex = this._getNextFreeLogicalColumnIndex(nextIndex);
+                    nextIndex = this._nextAvailableItemIndex(nextIndex);
                     indexes[I] = nextIndex;
                     this._userUseIndex(nextIndex);
                     I++;
@@ -3067,7 +2975,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         _readDim: function(name, reader) {
             var info, spec, index = this._userIndexesToSingleDim.indexOf(name);
             if (index >= 0) {
-                info = this._logicalRowInfos[index];
+                info = this._itemInfos[index];
                 if (info && !this.options.ignoreMetadataLabels) {
                     var label = info.label || info.name && def.titleFromName(info.name);
                     label && (spec = {
@@ -3084,28 +2992,28 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         },
         _executeCore: function() {
             var dimsReaders = this._getDimensionsReaders();
-            return def.query(this._getLogicalRows()).select(function(row) {
-                return this._readLogicalRow(row, dimsReaders);
+            return def.query(this._getItems()).select(function(item) {
+                return this._readItem(item, dimsReaders);
             }, this);
         },
-        _getLogicalRows: function() {
+        _getItems: function() {
             return this.source;
         },
         _getDimensionsReaders: function() {
-            return this._userDimsReaders.slice().reverse();
+            return this._userDimsReaders;
         },
-        _readLogicalRow: function(logicalRow, dimsReaders) {
-            for (var doLog = this._logLogicalRows && this._logLogicalRowBefore(logicalRow), r = dimsReaders.length, data = this.data, atoms = {}; r--; ) dimsReaders[r].call(data, logicalRow, atoms);
-            doLog && this._logLogicalRowAfter(atoms);
+        _readItem: function(item, dimsReaders) {
+            for (var logItem = this._logItems && this._logItemBefore(item), r = 0, R = dimsReaders.length, data = this.data, atoms = {}; R > r; ) dimsReaders[r++].call(data, item, atoms);
+            logItem && this._logItemAfter(atoms);
             return atoms;
         },
-        _logLogicalRowBefore: function(logicalRow) {
-            if (this._logLogicalRowCount < 10) return def.log("logical row [" + this._logLogicalRowCount++ + "]: " + def.describe(logicalRow)), 
+        _logItemBefore: function(vitem) {
+            if (this._logItemCount < 10) return def.log("virtual item [" + this._logItemCount++ + "]: " + def.describe(vitem)), 
             !0;
             def.log("...");
-            return this._logLogicalRows = !1;
+            return this._logItems = !1;
         },
-        _logLogicalRowAfter: function(readAtoms) {
+        _logItemAfter: function(readAtoms) {
             var logAtoms = {};
             for (var dimName in readAtoms) {
                 var atom = readAtoms[dimName];
@@ -3115,94 +3023,69 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             def.log("-> read: " + def.describe(logAtoms));
         },
         _propGet: function(dimName, prop) {
-            function propGet(logicalRow, atoms) {
-                atoms[dimName] = logicalRow[prop];
+            function propGet(item, atoms) {
+                atoms[dimName] = item[prop];
             }
             return propGet;
         },
-        _getNextFreeLogicalColumnIndex: function(index, L) {
+        _nextAvailableItemIndex: function(index, L) {
             null == index && (index = 0);
             null == L && (L = 1/0);
-            for (;L > index && def.hasOwn(this._userUsedIndexes, index); ) index++;
+            for (;L > index && def.hasOwn(this._userItem, index); ) index++;
             return L > index ? index : -1;
         },
-        _getPhysicalGroupStartIndex: function(name) {
-            return def.getOwn(this._logicalRowPhysicalGroupIndex, name);
+        _getLogicalGroupStartIndex: function(name) {
+            return def.getOwn(this._itemLogicalGroupIndex, name);
         },
-        _getPhysicalGroupLength: function(name) {
-            return def.getOwn(this._logicalRowPhysicalGroupsLength, name);
+        _getLogicalGroupLength: function(name) {
+            return def.getOwn(this._itemLogicalGroupsLength, name);
         },
-        _configureTypeByPhysicalGroup: function(physicalGroupName, dimGroupName, dimCount, levelMax) {
-            var gStartIndex = this._logicalRowPhysicalGroupIndex[physicalGroupName], gLength = this._logicalRowPhysicalGroupsLength[physicalGroupName], gEndIndex = gStartIndex + gLength - 1, index = gStartIndex;
-            dimCount = null == dimCount ? gLength : Math.min(gLength, dimCount);
-            if (dimCount && gEndIndex >= index) {
-                dimGroupName || (dimGroupName = physicalGroupName);
-                levelMax || (levelMax = 1/0);
-                for (var dimName, level = 0; dimCount && levelMax > level; ) {
+        _collectDimReaders: function(dimsReaders, logGroupName, dimGroupName, count, startIndex, levelCount) {
+            var gStartIndex = this._itemLogicalGroupIndex[logGroupName], gLength = this._itemLogicalGroupsLength[logGroupName], gEndIndex = gStartIndex + gLength - 1, index = Math.max(gStartIndex, startIndex || 0);
+            count = null == count ? gLength : Math.min(gLength, count);
+            if (count && gEndIndex >= index) {
+                dimGroupName || (dimGroupName = logGroupName);
+                levelCount || (levelCount = 1/0);
+                for (var dimName, level = 0; count && levelCount > level; ) {
                     dimName = def.indexedId(dimGroupName, level++);
                     if (!this.complexTypeProj.isReadOrCalc(dimName)) {
-                        index = this._getNextFreeLogicalColumnIndex(index);
+                        index = this._nextAvailableItemIndex(index);
                         if (index > gEndIndex) return index;
-                        this.defReader({
+                        dimsReaders.push({
                             names: dimName,
                             indexes: index
                         });
                         index++;
-                        dimCount--;
+                        count--;
                     }
                 }
             }
             return index;
         },
-        _configureTypeByOrgLevel: function(discreteDimGroups, continuousDimGroups) {
-            var freeContinuous = [], freeDiscrete = [];
-            this._logicalRowInfos.forEach(function(info, index) {
+        _getUnboundRoleDefaultDimNames: function(roleName, count, dims, level) {
+            var role = this.chart.visualRoles[roleName];
+            if (role && !role.isPreBound()) {
+                var dimGroupName = role.defaultDimensionName;
+                if (dimGroupName) {
+                    dimGroupName = dimGroupName.match(/^(.*?)(\*)?$/)[1];
+                    dims || (dims = []);
+                    null == level && (level = 0);
+                    null == count && (count = 1);
+                    for (;count--; ) {
+                        var dimName = def.indexedId(dimGroupName, level++);
+                        this.complexTypeProj.isReadOrCalc(dimName) || dims.push(dimName);
+                    }
+                    return dims.length ? dims : null;
+                }
+            }
+        },
+        _collectFreeDiscreteAndContinuousIndexes: function(freeDisIndexes, freeMeaIndexes) {
+            this._itemInfos.forEach(function(info, index) {
                 if (!this[index]) {
-                    var indexes = 1 === info.type ? freeContinuous : freeDiscrete;
+                    var indexes = 1 === info.type ? freeMeaIndexes : freeDisIndexes;
                     indexes && indexes.push(index);
                 }
             }, this._userUsedIndexes);
-            this._configureTypeByDimGroups(freeDiscrete, this._processDimGroupSpecs(discreteDimGroups, !0, 1/0));
-            this._configureTypeByDimGroups(freeContinuous, this._processDimGroupSpecs(continuousDimGroups, !1, 1));
-        },
-        _processDimGroupSpecs: function(dimGroupSpecs, defaultGreedy, defaultMaxCount) {
-            return dimGroupSpecs.map(function(dimGroupSpec) {
-                return def.string.is(dimGroupSpec) ? {
-                    name: dimGroupSpec,
-                    greedy: defaultGreedy,
-                    maxCount: defaultMaxCount
-                } : def.setDefaults(dimGroupSpec, {
-                    greedy: defaultGreedy,
-                    maxCount: defaultMaxCount
-                });
-            });
-        },
-        _configureTypeByDimGroups: function(freeIndexes, dimGroups) {
-            if (dimGroups) for (var F, g = -1, G = dimGroups.length; ++g < G && (F = freeIndexes.length); ) {
-                var dimGroupSpec = dimGroups[g], maxCount = Math.min(dimGroupSpec.maxCount, F), defaultDims = this._getFreeDimGroupNames(dimGroupSpec.name, maxCount, dimGroupSpec.greedy);
-                if (defaultDims) {
-                    {
-                        defaultDims.length;
-                    }
-                    this.defReader({
-                        names: defaultDims,
-                        indexes: freeIndexes.splice(0, defaultDims.length)
-                    });
-                }
-            }
-        },
-        _getFreeDimGroupNames: function(dimGroupName, dimCount, greedy) {
-            if (!dimGroupName) return null;
-            var dims = [], level = 0;
-            null == dimCount && (dimCount = 1);
-            for (;dimCount; ) {
-                var dimName = def.indexedId(dimGroupName, level++);
-                if (this.complexTypeProj.isReadOrCalc(dimName)) greedy || dimCount--; else {
-                    dims.push(dimName);
-                    dimCount--;
-                }
-            }
-            return dims.length ? dims : null;
         }
     });
     def.type("cdo.MatrixTranslationOper", cdo.TranslationOper).add({
@@ -3222,34 +3105,25 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             integer: 1
         },
         _processMetadata: function() {
-            var columnTypes, typeCheckingMode = this.options.typeCheckingMode, knownContinColTypes = this._knownContinuousColTypes;
-            if ("none" === typeCheckingMode) columnTypes = def.query(this.metadata).select(function(colDef, colIndex) {
+            for (var knownContinColTypes = this._knownContinuousColTypes, columns = def.query(this.metadata).select(function(colDef, colIndex) {
                 colDef.colIndex = colIndex;
+                return colDef;
+            }).where(function(colDef) {
                 var colType = colDef.colType;
-                return colType && 1 === knownContinColTypes[colType.toLowerCase()] ? 1 : 0;
-            }).array(); else {
-                var checkNumericString = "extended" === typeCheckingMode, columns = def.query(this.metadata).select(function(colDef, colIndex) {
-                    colDef.colIndex = colIndex;
-                    return colDef;
-                }).where(function(colDef) {
-                    var colType = colDef.colType;
-                    return !colType || 1 !== knownContinColTypes[colType.toLowerCase()];
-                }).select(function(colDef) {
-                    return colDef.colIndex;
-                }).array(), I = this.I, source = this.source, J = columns.length;
-                columnTypes = def.array.create(this.J, 1);
-                for (var i = 0; I > i && J > 0; i++) for (var row = source[i], m = 0; J > m; ) {
-                    var j = columns[m], value = row[j];
-                    if (null != value) {
-                        columnTypes[j] = this._getSourceValueType(value, checkNumericString);
-                        columns.splice(m, 1);
-                        J--;
-                    } else m++;
-                }
+                return !colType || 1 !== knownContinColTypes[colType.toLowerCase()];
+            }).select(function(colDef) {
+                return colDef.colIndex;
+            }).array(), columnTypes = def.array.create(this.J, 1), I = this.I, source = this.source, J = columns.length, i = 0; I > i && J > 0; i++) for (var row = source[i], m = 0; J > m; ) {
+                var j = columns[m], value = row[j];
+                if (null != value) {
+                    columnTypes[j] = this._getSourceValueType(value);
+                    columns.splice(m, 1);
+                    J--;
+                } else m++;
             }
             this._columnTypes = columnTypes;
         },
-        _buildLogicalColumnInfoFromMetadata: function(index) {
+        _buildItemInfoFromMetadata: function(index) {
             var meta = this.metadata[index];
             return {
                 type: this._columnTypes[index],
@@ -3257,16 +3131,13 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                 label: meta.colLabel
             };
         },
-        _getSourceValueType: function(value, checkNumericString) {
+        _getSourceValueType: function(value) {
             switch (typeof value) {
               case "number":
                 return 1;
 
-              case "string":
-                return checkNumericString && "" !== value && !isNaN(+value) ? 1 : 0;
-
               case "object":
-                return value instanceof Date ? 1 : 0;
+                if (value instanceof Date) return 1;
             }
             return 0;
         },
@@ -3295,17 +3166,17 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             table.rowSep().row("(" + Math.min(R, this.I) + "/" + this.I + ")").rowSep(!0);
             return "DATA SOURCE SUMMARY\n" + table() + "\n";
         },
-        _logLogicalRow: function(kindList, kindScope) {
+        _logVItem: function(kindList, kindScope) {
             var table = def.textTable(6).rowSep().row("Index", "Kind", "Type", "Name", "Label", "Dimension").rowSep(), index = 0;
             kindList.forEach(function(kind) {
                 for (var i = 0, L = kindScope[kind]; L > i; i++) {
-                    var info = this._logicalRowInfos[index];
+                    var info = this._itemInfos[index];
                     table.row(index, kind, info.type ? "number" : "string", info.name || "", info.label || "", this._userIndexesToSingleDim[index] || "");
                     index++;
                 }
             }, this);
             table.rowSep(!0);
-            return "LOGICAL TABLE\n" + table() + "\n";
+            return "VIRTUAL ITEM ARRAY\n" + table() + "\n";
         },
         _createPlot2SeriesKeySet: function(plot2DataSeriesIndexes, seriesKeys) {
             var plot2SeriesKeySet = null, seriesCount = seriesKeys.length;
@@ -3340,44 +3211,46 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             });
         },
         _configureTypeCore: function() {
-            [ "series", "category", "value" ].forEach(function(physicalGroupName) {
-                this._configureTypeByPhysicalGroup(physicalGroupName);
+            var index = 0, dimsReaders = [];
+            [ "series", "category", "value" ].forEach(function(logGroupName) {
+                index = this._collectDimReaders(dimsReaders, logGroupName, null, 1/0, index);
             }, this);
+            dimsReaders.forEach(this.defReader, this);
         }
     });
     cdo.previewRowsMax = 15;
     cdo.previewColsMax = 6;
     def.type("cdo.CrosstabTranslationOper", cdo.MatrixTranslationOper).add({
         _translType: "Crosstab",
-        logicalColumnCount: function() {
+        virtualItemSize: function() {
             return this.R + this.C + this.M;
         },
         _executeCore: function() {
-            function updateLogicalRowCrossGroup(crossGroupId, source) {
-                for (var logColIndex = logicalRowCrossGroupIndex[crossGroupId], sourceIndex = 0, depth = me[crossGroupId]; depth-- > 0; ) logRow[logColIndex++] = source[sourceIndex++];
+            function updateVItemCrossGroup(crossGroupId, source) {
+                for (var itemIndex = itemCrossGroupIndex[crossGroupId], sourceIndex = 0, depth = me[crossGroupId]; depth-- > 0; ) item[itemIndex++] = source[sourceIndex++];
             }
-            function updateLogicalRowMeasure(line, cg) {
-                for (var logColIndex = logicalRowCrossGroupIndex.M, cgIndexes = me._colGroupsIndexes[cg], depth = me.M, i = 0; depth > i; i++) {
+            function updateVItemMeasure(line, cg) {
+                for (var itemIndex = itemCrossGroupIndex.M, cgIndexes = me._colGroupsIndexes[cg], depth = me.M, i = 0; depth > i; i++) {
                     var lineIndex = cgIndexes[i];
-                    logRow[logColIndex++] = null != lineIndex ? line[lineIndex] : null;
+                    item[itemIndex++] = null != lineIndex ? line[lineIndex] : null;
                 }
             }
             if (!this.metadata.length) return def.query();
-            var dimsReaders = this._getDimensionsReaders(), logRow = new Array(this.logicalColumnCount()), logicalRowCrossGroupIndex = this._logicalRowCrossGroupIndex, me = this, q = def.query(this.source);
+            var dimsReaders = this._getDimensionsReaders(), item = new Array(this.virtualItemSize()), itemCrossGroupIndex = this._itemCrossGroupIndex, me = this, q = def.query(this.source);
             if (this._colGroups && this._colGroups.length) {
                 var expandLine = function(line) {
-                    updateLogicalRowCrossGroup("R", line);
+                    updateVItemCrossGroup("R", line);
                     return def.query(this._colGroups).select(function(colGroup, cg) {
-                        updateLogicalRowCrossGroup("C", colGroup);
-                        updateLogicalRowMeasure(line, cg);
-                        return this._readLogicalRow(logRow, dimsReaders);
+                        updateVItemCrossGroup("C", colGroup);
+                        updateVItemMeasure(line, cg);
+                        return this._readItem(item, dimsReaders);
                     }, this);
                 };
                 return q.selectMany(expandLine, this);
             }
             return q.select(function(line) {
-                updateLogicalRowCrossGroup("R", line);
-                return this._readLogicalRow(logRow, dimsReaders);
+                updateVItemCrossGroup("R", line);
+                return this._readItem(item, dimsReaders);
             }, this);
         },
         _processMetadata: function() {
@@ -3401,7 +3274,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     };
                 };
                 return metadata.map(f);
-            }(), logicalRowCrossGroupInfos = this._logicalRowCrossGroupInfos = {};
+            }(), itemCrossGroupInfos = this._itemCrossGroupInfos = {};
             if (this.options.isMultiValued) {
                 var measuresInColumns = def.get(this.options, "measuresInColumns", !0);
                 if (measuresInColumns || null == this.options.measuresIndex) {
@@ -3418,18 +3291,18 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                                 this._colGroups[cg] = this._splitEncodedColGroupCell(colGroup);
                                 this._colGroupsIndexes[cg] = [ this.R + cg ];
                             }, this);
-                            logicalRowCrossGroupInfos.M = [ this._buildLogicalColumnInfoFromMetadata(R) ];
+                            itemCrossGroupInfos.M = [ this._buildItemInfoFromMetadata(R) ];
                         }
                         this.C = this._colGroups[0].length;
-                        logicalRowCrossGroupInfos.C = def.range(0, this.C).select(function() {
+                        itemCrossGroupInfos.C = def.range(0, this.C).select(function() {
                             return {
                                 type: 0
                             };
                         }).array();
                     } else {
                         this.C = this.M = 0;
-                        logicalRowCrossGroupInfos.M = [];
-                        logicalRowCrossGroupInfos.C = [];
+                        itemCrossGroupInfos.M = [];
+                        itemCrossGroupInfos.C = [];
                     }
                 } else {
                     this.measuresDirection = "rows";
@@ -3450,37 +3323,37 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
                     this._colGroups[cg] = [ colGroup ];
                     this._colGroupsIndexes[cg] = [ R + cg ];
                 }, this);
-                logicalRowCrossGroupInfos.C = [ {
+                itemCrossGroupInfos.C = [ {
                     type: 0
                 } ];
-                logicalRowCrossGroupInfos.M = [ {
+                itemCrossGroupInfos.M = [ {
                     type: this._columnTypes[R]
                 } ];
             }
-            logicalRowCrossGroupInfos.R = def.range(0, this.R).select(this._buildLogicalColumnInfoFromMetadata, this).array();
-            var logicalRowCrossGroupIndex = this._logicalRowCrossGroupIndex = {
+            itemCrossGroupInfos.R = def.range(0, this.R).select(this._buildItemInfoFromMetadata, this).array();
+            var itemGroupIndex = this._itemCrossGroupIndex = {
                 C: seriesInRows ? this.R : 0,
                 R: seriesInRows ? 0 : this.C,
                 M: this.C + this.R
-            }, logicalRowInfos = this._logicalRowInfos = new Array(this.logicalColumnCount());
-            def.eachOwn(logicalRowCrossGroupIndex, function(groupStartIndex, crossGroup) {
-                logicalRowCrossGroupInfos[crossGroup].forEach(function(info, groupIndex) {
-                    logicalRowInfos[groupStartIndex + groupIndex] = info;
+            }, itemInfos = this._itemInfos = new Array(this.virtualItemSize());
+            def.eachOwn(itemGroupIndex, function(groupStartIndex, crossGroup) {
+                itemCrossGroupInfos[crossGroup].forEach(function(info, groupIndex) {
+                    itemInfos[groupStartIndex + groupIndex] = info;
                 });
             });
-            this._logicalRowPhysicalGroupsLength = {
+            this._itemLogicalGroupsLength = {
                 series: seriesInRows ? this.R : this.C,
                 category: seriesInRows ? this.C : this.R,
                 value: this.M
             };
-            this._logicalRowPhysicalGroupIndex = {
+            this._itemLogicalGroupIndex = {
                 series: 0,
-                category: this._logicalRowPhysicalGroupsLength.series,
+                category: this._itemLogicalGroupsLength.series,
                 value: this.C + this.R
             };
         },
-        logLogicalRow: function() {
-            return this._logLogicalRow([ "C", "R", "M" ], {
+        logVItem: function() {
+            return this._logVItem([ "C", "R", "M" ], {
                 C: this.C,
                 R: this.R,
                 M: this.M
@@ -3573,7 +3446,7 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             });
             this._colGroups = colGroupsValues;
             this._colGroupsIndexes = colGroupsIndexes;
-            this._logicalRowCrossGroupInfos.M = measuresInfoList;
+            this._itemCrossGroupInfos.M = measuresInfoList;
             this.M = M;
         },
         configureType: function() {
@@ -3671,26 +3544,26 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             this.M = M;
             this.S = S;
             this.C = C;
-            var logicalRowPerm = [];
+            var itemPerm = [];
             [ "S", "C", "M" ].forEach(function(name) {
                 var groupSpec = specsByName[name];
-                groupSpec && def.array.append(logicalRowPerm, groupSpec.indexes);
+                groupSpec && def.array.append(itemPerm, groupSpec.indexes);
             });
-            this._logicalRowInfos = logicalRowPerm.map(this._buildLogicalColumnInfoFromMetadata, this);
-            this._logicalRowPerm = logicalRowPerm;
-            this._logicalRowPhysicalGroupsLength = {
+            this._itemInfos = itemPerm.map(this._buildItemInfoFromMetadata, this);
+            this._itemPerm = itemPerm;
+            this._itemLogicalGroupsLength = {
                 series: this.S,
                 category: this.C,
                 value: this.M
             };
-            this._logicalRowPhysicalGroupIndex = {
+            this._itemLogicalGroupIndex = {
                 series: 0,
-                category: this._logicalRowPhysicalGroupsLength.series,
+                category: this._itemLogicalGroupsLength.series,
                 value: this.S + this.C
             };
         },
-        logLogicalRow: function() {
-            return this._logLogicalRow([ "S", "C", "M" ], {
+        logVItem: function() {
+            return this._logVItem([ "S", "C", "M" ], {
                 S: this.S,
                 C: this.C,
                 M: this.M
@@ -3708,10 +3581,10 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             }
         },
         _executeCore: function() {
-            var dimsReaders = this._getDimensionsReaders(), permIndexes = this._logicalRowPerm;
-            return def.query(this._getLogicalRows()).select(function(row) {
-                row = pv.permute(row, permIndexes);
-                return this._readLogicalRow(row, dimsReaders);
+            var dimsReaders = this._getDimensionsReaders(), permIndexes = this._itemPerm;
+            return def.query(this._getItems()).select(function(item) {
+                item = pv.permute(item, permIndexes);
+                return this._readItem(item, dimsReaders);
             }, this);
         }
     });
@@ -3747,18 +3620,11 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
             fractionPad: {
                 cast: String,
                 fail: def.falsy
-            },
-            abbreviations: {
-                fail: def.array.empty
             }
         },
         methods: {
             tryConfigure: function(other) {
-                if (def.is(other, numFormStyle)) return !!this.integerPad(other.integerPad()).fractionPad(other.fractionPad()).decimal(other.decimal()).group(other.group()).groupSizes(other.groupSizes()).negativeSign(other.negativeSign()).currency(other.currency()).abbreviations(other.abbreviations());
-                if (def.string.is(other)) {
-                    var formP = langProvider(other);
-                    if (formP) return !!def.configure(this, formP.number().style());
-                }
+                return def.is(other, numFormStyle) ? !!this.integerPad(other.integerPad()).fractionPad(other.fractionPad()).decimal(other.decimal()).group(other.group()).groupSizes(other.groupSizes()).negativeSign(other.negativeSign()).currency(other.currency()) : void 0;
             }
         }
     }, {
@@ -3771,7 +3637,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         decimal: ".",
         group: ",",
         groupSizes: [ 3 ],
-        abbreviations: [ "k", "m", "b", "t" ],
         negativeSign: "-",
         currency: "$"
     });
@@ -3838,19 +3703,9 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         return customFormat;
     };
     customForm.defaults = customForm().formatter(customForm_defaultFormatter);
-    var _defaultLangCode = "en-us", formProvider = cdo.format = function(config, proto) {
+    var formProvider = cdo.format = function(config, proto) {
         function formatProvider() {}
         formatProvider.tryConfigure = formProvider_tryConfigure;
-        var language;
-        if (!proto && def.string.is(config)) {
-            var formP = langProvider(config);
-            language = formP.languageCode;
-            if (formP) {
-                proto = formP;
-                config = null;
-            }
-        }
-        formatProvider.languageCode = language ? language : _defaultLangCode;
         def.classify(formatProvider, formProvider);
         def.instance(formatProvider, config, proto, {
             number: formProvider_field(numForm),
@@ -3868,61 +3723,6 @@ pen.define("cdf/lib/CCC/cdo", [ "cdf/lib/CCC/def", "cdf/lib/CCC/protovis" ], fun
         percent: "#,0.#%",
         date: "%Y/%m/%d",
         any: customForm()
-    });
-    var _languages = {}, _currentProvider = _languages[_defaultLangCode] = formProvider.defaults, langProvider = cdo.format.language = function(style, config) {
-        var L = arguments.length;
-        if (!L) return _currentProvider;
-        if (1 == L) {
-            if (void 0 === style) throw def.error.operationInvalid("Undefined 'style' value.");
-            if (null === style || "" === style) style = _defaultLangCode; else {
-                if (def.is(style, formProvider)) return _currentProvider = style;
-                if ("object" == typeof style) {
-                    for (var key in style) configLanguage(key, def.getOwn(style, key));
-                    return cdo.format;
-                }
-            }
-            return getLanguage(style, !0);
-        }
-        if (2 == L) return configLanguage(style, config);
-        throw def.error.operationInvalid("Wrong number of arguments");
-    };
-    langProvider({
-        "en-gb": {
-            number: {
-                mask: "#,0.##",
-                style: {
-                    integerPad: "0",
-                    fractionPad: "0",
-                    decimal: ".",
-                    group: ",",
-                    groupSizes: [ 3 ],
-                    abbreviations: [ "k", "m", "b", "t" ],
-                    negativeSign: "-",
-                    currency: "£"
-                }
-            },
-            date: {
-                mask: "%d/%m/%Y"
-            }
-        },
-        "pt-pt": {
-            number: {
-                mask: "#,0.##",
-                style: {
-                    integerPad: "0",
-                    fractionPad: "0",
-                    decimal: ",",
-                    group: " ",
-                    groupSizes: [ 3 ],
-                    abbreviations: [ "k", "m", "b", "t" ],
-                    negativeSign: "-",
-                    currency: "€"
-                }
-            },
-            date: {
-                mask: "%d/%m/%Y"
-            }
-        }
     });
     return cdo;
 });
