@@ -103,6 +103,8 @@ public class RemoteFileManager {
 			if (remoteFileIdObj instanceof String) {
 				remoteFileId = (String) remoteFileIdObj;
 				// TODO associate remote file id with local file
+				// TODO resourceFiles
+				// TODO error
 			}
 		}
 		return remoteFileId;
