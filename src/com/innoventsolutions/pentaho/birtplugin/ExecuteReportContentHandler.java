@@ -175,18 +175,16 @@ public class ExecuteReportContentHandler {
 				configuration.getUsername(), configuration.getPassword());
 		final Client client = Client.create(config);
 		client.addFilter(authFilter);
-		String mimeType = "text/html";
-		String outputFormat = "html";
+		final String mimeType;
+		final String outputFormat;
 		if (outputTarget != null) {
-			if (outputTarget.toLowerCase().indexOf("html") >= 0) {
-				mimeType = "text/html";
-				outputFormat = "html";
-			}
-			else if (outputTarget.toLowerCase().indexOf("pdf") >= 0) {
-				mimeType = "application/pdf";
-				outputFormat = "pdf";
-			}
-			// TODO
+			mimeType = BirtReportingAction
+					.getMimeTypeFromOutputType(outputTarget);
+			outputFormat = outputTarget;
+		}
+		else {
+			mimeType = "application/octet-stream";
+			outputFormat = "rptdocument";
 		}
 		final WebResource service = client.resource(configuration.getUri())
 				.path("birt").path("report").path("run").path(outputFormat)

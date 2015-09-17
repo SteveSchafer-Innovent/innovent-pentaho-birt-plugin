@@ -113,9 +113,7 @@ public class BirtReportingAction implements IStreamingAction, IVarArgsAction {
 				final String renderModeString = (String) renderModeObj;
 				renderMode = RENDER_TYPE.valueOf(renderModeString);
 				// If render mode is not passed in the request or path
-				// parameter,
-				// then
-				// we will assume that the render type is REPORT
+				// parameter, then we will assume that the render type is REPORT
 				if (renderMode == null) {
 					renderMode = RENDER_TYPE.REPORT;
 				}
@@ -210,14 +208,46 @@ public class BirtReportingAction implements IStreamingAction, IVarArgsAction {
 		if (!(outputTargetObj instanceof String)) {
 			return "text/html";
 		}
-		final String outputTarget = (String) outputTargetObj;
-		if (outputTarget.toLowerCase().indexOf("html") >= 0) {
+		return getMimeTypeFromOutputType((String) outputTargetObj);
+	}
+
+	public static String getMimeTypeFromOutputType(final String outputType) {
+		if (outputType.toLowerCase().equals("html")) {
 			return "text/html";
 		}
-		if (outputTarget.toLowerCase().indexOf("pdf") >= 0) {
+		if (outputType.toLowerCase().equals("pdf")) {
 			return "application/pdf";
 		}
-		// TODO
-		return "text/html";
+		if (outputType.toLowerCase().equals("xls")) {
+			return "application/vnd.ms-excel";
+		}
+		if (outputType.toLowerCase().equals("xlsx")) {
+			return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+		}
+		if (outputType.toLowerCase().equals("doc")) {
+			return "application/msword";
+		}
+		if (outputType.toLowerCase().equals("docx")) {
+			return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+		}
+		if (outputType.toLowerCase().equals("ppt")) {
+			return "application/vnd.ms-powerpoint";
+		}
+		if (outputType.toLowerCase().equals("pptx")) {
+			return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+		}
+		if (outputType.toLowerCase().equals("odt")) {
+			return "application/vnd.oasis.opendocument.text";
+		}
+		if (outputType.toLowerCase().equals("ods")) {
+			return "application/vnd.oasis.opendocument.text";
+		}
+		if (outputType.toLowerCase().equals("odp")) {
+			return "application/vnd.oasis.opendocument.presentation";
+		}
+		if (outputType.toLowerCase().equals("postscript")) {
+			return "application/postscript";
+		}
+		return "application/octet-stream";
 	}
 }

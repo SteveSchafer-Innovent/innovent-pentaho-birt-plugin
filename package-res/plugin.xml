@@ -19,6 +19,7 @@
         <meta-provider>com.innoventsolutions.pentaho.birtplugin.BIRTContentTypeMetaProvider</meta-provider>
         <operations>
           <!-- for any of these urls, you can add layout=flow to the url -->
+          <!--
           <operation>
             <id>RUN</id>
             <perspective>viewer</perspective>
@@ -27,6 +28,7 @@
             <id>NEWWINDOW</id>
             <perspective>viewer</perspective>
           </operation>
+          -->
           <operation>
             <id>SCHEDULE_NEW</id>
             <perspective>viewer</perspective>

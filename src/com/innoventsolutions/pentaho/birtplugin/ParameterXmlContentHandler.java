@@ -39,6 +39,7 @@ public class ParameterXmlContentHandler {
 	private Document document;
 	private final Configuration configuration;
 	private String remoteFileId = null;
+	@SuppressWarnings("unused")
 	private final boolean paginate;
 
 	public ParameterXmlContentHandler(
@@ -63,6 +64,7 @@ public class ParameterXmlContentHandler {
 		}
 		this.document = DocumentBuilderFactory.newInstance()
 				.newDocumentBuilder().newDocument();
+		@SuppressWarnings("unused")
 		final boolean isMobile = "true".equals(requestParameters
 				.getStringParameter("mobile", "false"));
 		// TODO inputs may contain parameter values and result in parameter
@@ -221,6 +223,30 @@ public class ParameterXmlContentHandler {
 				"html".equals(defaultValue), "java.lang.String", "html"));
 		valuesElement.appendChild(createValueElement("PDF", false,
 				"pdf".equals(defaultValue), "java.lang.String", "pdf"));
+		valuesElement.appendChild(createValueElement("XLS", false,
+				"xls".equals(defaultValue), "java.lang.String", "xls"));
+		valuesElement.appendChild(createValueElement("XLSX", false,
+				"xlsx".equals(defaultValue), "java.lang.String", "xlsx"));
+		valuesElement.appendChild(createValueElement("DOC", false,
+				"doc".equals(defaultValue), "java.lang.String", "doc"));
+		valuesElement.appendChild(createValueElement("DOCX", false,
+				"docx".equals(defaultValue), "java.lang.String", "docx"));
+		valuesElement.appendChild(createValueElement("ODP", false,
+				"odp".equals(defaultValue), "java.lang.String", "odp"));
+		valuesElement.appendChild(createValueElement("ODS", false,
+				"odp".equals(defaultValue), "java.lang.String", "odp"));
+		valuesElement.appendChild(createValueElement("ODT", false,
+				"odt".equals(defaultValue), "java.lang.String", "odt"));
+		valuesElement.appendChild(createValueElement("POSTSCRIPT", false,
+				"postscript".equals(defaultValue), "java.lang.String",
+				"postscript"));
+		valuesElement.appendChild(createValueElement("PPT", false,
+				"ppt".equals(defaultValue), "java.lang.String", "ppt"));
+		valuesElement.appendChild(createValueElement("PPTX", false,
+				"pptx".equals(defaultValue), "java.lang.String", "pptx"));
+		valuesElement.appendChild(createValueElement("RPTDOCUMENT", false,
+				"rptdocument".equals(defaultValue), "java.lang.String",
+				"rptdocument"));
 		// TODO
 		// </values>
 		// </parameter>
@@ -388,23 +414,30 @@ public class ParameterXmlContentHandler {
 		final String name = helper.getStringValue("name");
 		final Object requestValue = requestParameters.getParameter(name);
 		final String displayName = helper.getStringValue("displayName");
+		@SuppressWarnings("unused")
 		final String helpText = helper.getStringValue("helpText");
+		@SuppressWarnings("unused")
 		final String type = helper.getStringValue("type");
 		final String promptText = helper.getStringValue("promptText");
 		final String dataType = helper.getStringValue("dataType");
 		final Boolean isHidden = helper.getBooleanValue("hidden");
 		final Boolean isRequired = helper.getBooleanValue("required");
 		final Boolean allowNewValues = helper.getBooleanValue("allowNewValues");
+		@SuppressWarnings("unused")
 		final Boolean displayInFixedOrder = helper
 				.getBooleanValue("displayInFixedOrder");
+		@SuppressWarnings("unused")
 		final Boolean valueIsConcealed = helper
 				.getBooleanValue("valueConcealed");
+		@SuppressWarnings("unused")
 		final String displayFormat = helper.getStringValue("displayFormat");
 		final String controlType = helper.getStringValue("controlType");
+		@SuppressWarnings("unused")
 		final String alignment = helper.getStringValue("alignment");
 		final String defaultValue = helper.getStringValue("defaultValue");
 		final String scalarParameterType = helper
 				.getStringValue("scalarParameterType");
+		@SuppressWarnings("unused")
 		final Integer autoSuggestThreshold = helper
 				.getIntegerValue("autoSuggestThreshold");
 		final boolean isList = "list-box".equals(controlType);
