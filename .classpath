@@ -28,7 +28,7 @@
 	<classpathentry kind="lib" path="war/WEB-INF/lib/commons-vfs-20100924-pentaho.jar"/>
 	<classpathentry kind="lib" path="war/WEB-INF/lib/dom4j-1.6.1.jar"/>
 	<classpathentry kind="lib" path="war/WEB-INF/lib/ehcache-core-2.5.1.jar"/>
-	<classpathentry kind="lib" path="war/WEB-INF/lib/esapi-2.0.1.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/esapi-2.0.1.jar" sourcepath="/home/steve/java/jersey-bundle-1.16-sources.jar"/>
 	<classpathentry kind="lib" path="war/WEB-INF/lib/guava-17.0.jar"/>
 	<classpathentry kind="lib" path="war/WEB-INF/lib/hibernate-commons-annotations-3.2.0.Final.jar"/>
 	<classpathentry kind="lib" path="war/WEB-INF/lib/hibernate-core-3.6.9.Final.jar"/>

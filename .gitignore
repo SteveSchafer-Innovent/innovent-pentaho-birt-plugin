@@ -1,4 +1,4 @@
 bin/
-dist/
 build/
+war/
 .gitignore.swp
