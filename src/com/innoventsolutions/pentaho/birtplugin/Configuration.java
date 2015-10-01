@@ -20,9 +20,12 @@ public class Configuration {
 				.getProperty("com.innoventsolutions.bmr.password");
 		final String uriString = properties
 				.getProperty("com.innoventsolutions.bmr.uri");
+		System.out.println("com.innoventsolutions.bmr.uri = " + uriString);
 		this.uri = UriBuilder.fromUri(uriString).build();
 		this.resourceDir = properties
 				.getProperty("com.innoventsolutions.bmr.resource-dir");
+		System.out.println("com.innoventsolutions.bmr.resource-dir = "
+				+ this.resourceDir);
 	}
 
 	public String getUsername() {
