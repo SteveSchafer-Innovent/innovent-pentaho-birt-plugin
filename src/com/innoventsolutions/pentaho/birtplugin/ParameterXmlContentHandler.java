@@ -55,6 +55,7 @@ public class ParameterXmlContentHandler {
 			final Serializable fileId, final String path,
 			final boolean overrideOutputType, final Object object)
 			throws Exception {
+		System.out.println("createParameterContent");
 		// object == null, fileId is a uuid
 		final String sessionIdKey = SYS_PARAM_SESSION_ID;
 		final Object rawSessionId = inputs.get(sessionIdKey);
@@ -86,6 +87,7 @@ public class ParameterXmlContentHandler {
 		final RemoteFileManager remoteFileManager = new RemoteFileManager(
 				configuration);
 		remoteFileId = remoteFileManager.registerFile(fileId);
+		System.out.println("file is registered, id = " + remoteFileId);
 		if (remoteFileId != null) {
 			final ClientConfig config = new DefaultClientConfig();
 			final ClientFilter authFilter = new HTTPBasicAuthFilter(
@@ -95,15 +97,18 @@ public class ParameterXmlContentHandler {
 			final WebResource service = client.resource(configuration.getUri())
 					.path("birt").path("report").path("parameters")
 					.path(remoteFileId);
+			System.out.println("service = " + service);
 			final WebResource.Builder builder = service
 					.accept(MediaType.APPLICATION_JSON_TYPE);
 			final ClientResponse response = builder.get(ClientResponse.class);
 			if (response.getStatus() != 200) {
+				System.out.println("Get parameters request failed: "
+						+ response.getClientResponseStatus());
 				throw new RuntimeException("Get parameters request failed: "
 						+ response.getStatus());
 			}
 			final String jsonString = response.getEntity(String.class);
-			System.out.println(jsonString);
+			System.out.println("GET parameters returned " + jsonString);
 			final Object jsonObj = JSON.parse(jsonString);
 			if (jsonObj instanceof Object[]) {
 				final Object[] paramsObjArray = (Object[]) jsonObj;
@@ -120,6 +125,7 @@ public class ParameterXmlContentHandler {
 			parameters.appendChild(createAcceptedPageElement());
 			parameters.appendChild(createShowParametersElement());
 			parameters.appendChild(createOutputTargetElement());
+			System.out.println("parameters = " + parameters);
 		}
 		this.document.appendChild(parameters);
 		final DOMSource source = new DOMSource(document);
@@ -127,6 +133,7 @@ public class ParameterXmlContentHandler {
 		final Transformer transformer = TransformerFactory.newInstance()
 				.newTransformer();
 		transformer.transform(source, result);
+		System.out.println("createParameterContent finished");
 	}
 
 	private Boolean getBooleanRequestParameter(final String parameterName) {
