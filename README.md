@@ -12,6 +12,8 @@ The BIRT plugin is built with Apache Ant.
 
 2) run ant
 
+See the wiki for more installation options.
+
 License
 -------
 Licensed under the Apache License, Version 2.0. See LICENSE for more information.
